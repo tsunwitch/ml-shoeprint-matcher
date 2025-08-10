@@ -45,5 +45,25 @@ class ModelTrainer:
         
         return self.model_dir / 'feature_detection' / 'weights' / 'best.pt'
     
+    def train_axis_detection_model(self, data_yaml: str, config: dict):
+        """Train axis detection model for detecting shoe longitudinal axis"""
+        model = YOLO(config['model_size'])
+        
+        results = model.train(
+            data=data_yaml,
+            epochs=config['epochs'],
+            batch=config['batch_size'],
+            imgsz=config['imgsz'],
+            project=str(self.model_dir),
+            name='axis_detection',
+            exist_ok=True,
+            device=0,
+            patience=20,
+            save=True,
+            pretrained=True
+        )
+        
+        return self.model_dir / 'axis_detection' / 'weights' / 'best.pt'
+    
     def load_model(self, model_path: str):
         return YOLO(model_path)
