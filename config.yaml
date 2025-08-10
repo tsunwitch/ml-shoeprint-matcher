@@ -1,0 +1,46 @@
+paths:
+  raw_data: "marked_data"
+  processed_data: "processed_data"
+  yolo_datasets: "yolo_datasets"
+  models: "trained_models"
+  cache: "cache"
+
+data:
+  image_size: [1690, 4660]
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  random_seed: 42
+
+models:
+  shoe_segmentation:
+    model_size: "yolov8m-seg"
+    epochs: 100
+    batch_size: 8
+    imgsz: 1280
+    confidence: 0.5
+
+  axis_detection:
+    model_size: "yolov8m"
+    epochs: 100
+    batch_size: 16
+    imgsz: 1280
+    confidence: 0.5
+
+  feature_detection:
+    model_size: "yolov8m"
+    epochs: 150
+    batch_size: 16
+    imgsz: 1280
+    confidence: 0.20
+
+matching:
+  dtw:
+    window_size: 10
+    distance_threshold: 0.3
+  features:
+    iou_threshold: 0.5
+    min_matches: 3
+  weights:
+    feature_weight: 0.8
+    dtw_weight: 0.2

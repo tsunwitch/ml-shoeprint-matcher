@@ -1,0 +1,333 @@
+import streamlit as st
+import cv2
+import numpy as np
+from pathlib import Path
+import yaml
+from PIL import Image
+
+from src.pipeline import ShoeprintPipeline
+from src.data.loader import ShoeDataLoader
+from src.utils.visualization import draw_features, draw_bbox, create_comparison_image
+
+st.set_page_config(page_title="Shoeprint Forensics", layout="wide")
+
+@st.cache_resource
+def load_pipeline():
+    pipeline = ShoeprintPipeline("config.yaml")
+    
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    
+    seg_model = Path(config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
+    feat_model = Path(config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
+    
+    if seg_model.exists():
+        pipeline.load_models(segmentation_path=str(seg_model))
+    
+    if feat_model.exists():
+        pipeline.load_models(feature_path=str(feat_model))
+    
+    return pipeline
+
+@st.cache_resource
+def load_database():
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    
+    loader = ShoeDataLoader(config['paths']['raw_data'])
+    data = loader.load_all_data()
+    
+    pipeline = load_pipeline()
+    
+    for shoe_id in list(data['images'].keys())[:20]:
+        for annotator in data['images'][shoe_id]:
+            for print_id, image_path in data['images'][shoe_id][annotator].items():
+                try:
+                    results = pipeline.process_image(image_path)
+                    pipeline.add_to_database(shoe_id, results)
+                except Exception as e:
+                    st.warning(f"Failed to process {image_path}: {e}")
+                break
+            break
+    
+    return pipeline
+
+def main():
+    st.title("🦶 Shoeprint Forensics System")
+    
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Segmentation Demo", "Feature Detection", "Search", "Axis/DTW Demo", "Config"])
+    
+    with tab1:
+        st.header("Shoe Segmentation")
+        
+        uploaded_file = st.file_uploader("Upload a shoeprint image", type=['jpg', 'jpeg', 'png'])
+        
+        if uploaded_file is not None:
+            image = Image.open(uploaded_file)
+            image_np = np.array(image)
+            
+            pipeline = load_pipeline()
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Original Image")
+                st.image(image_np, use_column_width=True)
+            
+            if pipeline.segmenter:
+                cropped, bbox = pipeline.segmenter.segment_shoe(image_np)
+                
+                with col2:
+                    st.subheader("Segmented Shoe")
+                    if bbox:
+                        st.image(cropped, use_column_width=True)
+                        st.success(f"Bounding box: {bbox}")
+                    else:
+                        st.warning("No shoe detected")
+            else:
+                with col2:
+                    st.warning("Segmentation model not loaded. Run train_models.py first.")
+    
+    with tab2:
+        st.header("Feature Detection")
+        
+        uploaded_file2 = st.file_uploader("Upload image for feature detection", type=['jpg', 'jpeg', 'png'], key="feat")
+        
+        if uploaded_file2 is not None:
+            image = Image.open(uploaded_file2)
+            image_np = np.array(image)
+            
+            pipeline = load_pipeline()
+            
+            if pipeline.feature_detector:
+                
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+                    tmp_file.write(uploaded_file2.getbuffer())
+                    tmp_path = tmp_file.name
+                
+                
+                confidence = st.slider("Detection Confidence", 0.1, 1.0, 0.5, 0.05)
+                
+                results = pipeline.process_image(tmp_path)
+                
+                
+                if pipeline.feature_detector:
+                    features = pipeline.feature_detector.detect_features(
+                        results['cropped_shoe'], 
+                        confidence=confidence
+                    )
+                    results['features'] = features
+                
+                
+                import os
+                os.unlink(tmp_path)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("Original/Cropped")
+                    if 'cropped_shoe' in results and results['shoe_bbox'] is not None:
+                        st.image(results['cropped_shoe'], use_column_width=True)
+                        st.caption("Showing cropped shoe region")
+                    else:
+                        st.image(image_np, use_column_width=True)
+                        st.caption("Showing original (no segmentation)")
+                
+                with col2:
+                    st.subheader("Detected Features")
+                    if 'features' in results and results['features']:
+                        img_with_features = draw_features(results['cropped_shoe'], results['features'])
+                        st.image(img_with_features, use_column_width=True)
+                        st.info(f"Found {len(results['features'])} features")
+                    else:
+                        st.warning("No features detected")
+                        
+                        st.caption(f"Image shape: {results['cropped_shoe'].shape}")
+                        st.caption(f"Using confidence: {confidence}")
+                        if pipeline.segmenter:
+                            st.caption("Segmentation model loaded ✓")
+                        if pipeline.feature_detector:
+                            st.caption("Feature model loaded ✓")
+            else:
+                st.warning("Feature detection model not loaded. Run train_models.py first.")
+    
+    with tab3:
+        st.header("Shoe Search")
+        
+        if st.button("Load Database"):
+            with st.spinner("Loading database..."):
+                pipeline = load_database()
+                st.success(f"Loaded {len(pipeline.database['profiles'])} shoe images into database")
+        
+        uploaded_query = st.file_uploader("Upload query shoeprint", type=['jpg', 'jpeg', 'png'], key="search")
+        
+        if uploaded_query is not None:
+            image = Image.open(uploaded_query)
+            image_np = np.array(image)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.subheader("Query Image")
+                st.image(image_np, use_column_width=True)
+            
+            if st.button("Search"):
+                pipeline = load_database()
+                
+                with st.spinner("Searching..."):
+                    
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+                        tmp_file.write(uploaded_query.getbuffer())
+                        temp_path = tmp_file.name
+                    
+                    
+                    query_results = pipeline.process_image(temp_path)
+                    query_features = query_results.get('features', [])
+                    
+                    results = pipeline.search(temp_path, top_k=10)
+                    
+                    
+                    import os
+                    os.unlink(temp_path)
+                    
+                    with col2:
+                        st.subheader("Top 10 Matches")
+                        
+                        
+                        if query_features:
+                            query_with_features = draw_features(query_results['cropped_shoe'], query_features, color=(0, 255, 0))
+                            st.caption("Query image with detected features (green):")
+                            st.image(query_with_features, use_column_width=True)
+                            st.info(f"Query has {len(query_features)} detected features")
+                        
+                        st.divider()
+                        
+                        
+                        for i in range(0, len(results), 2):
+                            cols = st.columns(2)
+                            for j in range(2):
+                                if i + j < len(results):
+                                    image_id, score, metadata = results[i + j]
+                                    with cols[j]:
+                                        
+                                        if 'cropped_shoe' in metadata and metadata['cropped_shoe'] is not None:
+                                            img = metadata['cropped_shoe']
+                                        elif 'original_image' in metadata:
+                                            img = metadata['original_image']
+                                        else:
+                                            img = cv2.imread(metadata['path'])
+                                            if img is not None:
+                                                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                                        
+                                        
+                                        if img is not None and 'features' in metadata and metadata['features']:
+                                            img_with_features = draw_features(img, metadata['features'], color=(255, 0, 0))
+                                            st.image(img_with_features, use_column_width=True)
+                                            feature_count = len(metadata['features'])
+                                        else:
+                                            if img is not None:
+                                                st.image(img, use_column_width=True)
+                                                feature_count = 0
+                                            else:
+                                                feature_count = 0
+                                        
+                                        st.caption(f"#{i+j+1}: {image_id}")
+                                        st.caption(f"Score: {score:.3f}")
+                                        st.caption(f"Features: {feature_count}")
+                                        
+                                        
+                                        if query_features and metadata.get('features'):
+                                            matches = pipeline.feature_matcher.match_features(
+                                                query_features, 
+                                                metadata['features']
+                                            )
+                                            st.caption(f"Matching features: {matches}/{len(query_features)}")
+    
+    with tab4:
+        st.header("Axis Detection & DTW Profile")
+        
+        uploaded_file4 = st.file_uploader("Upload image for axis visualization", type=['jpg', 'jpeg', 'png'], key="axis")
+        
+        if uploaded_file4 is not None:
+            image = Image.open(uploaded_file4)
+            image_np = np.array(image)
+            
+            pipeline = load_pipeline()
+            
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+                tmp_file.write(uploaded_file4.getbuffer())
+                tmp_path = tmp_file.name
+            
+            results = pipeline.process_image(tmp_path)
+            
+            import os
+            os.unlink(tmp_path)
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.subheader("Original/Cropped")
+                if 'cropped_shoe' in results and results['shoe_bbox'] is not None:
+                    st.image(results['cropped_shoe'], use_column_width=True)
+                else:
+                    st.image(image_np, use_column_width=True)
+            
+            with col2:
+                st.subheader("Current Axis (Center)")
+                
+                if 'cropped_shoe' in results:
+                    img_with_axis = results['cropped_shoe'].copy()
+                    h, w = img_with_axis.shape[:2]
+                    
+                    cv2.line(img_with_axis, (w//2, 0), (w//2, h), (255, 0, 0), 3)
+                    st.image(img_with_axis, use_column_width=True)
+                    st.caption("Blue line: Center axis (currently used for DTW)")
+            
+            with col3:
+                st.subheader("DTW Profile")
+                
+                if 'cropped_shoe' in results:
+                    from src.utils.image_ops import extract_axis_profile
+                    profile = pipeline._extract_profile_from_image(results['cropped_shoe'])
+                    
+                    
+                    import matplotlib.pyplot as plt
+                    fig, ax = plt.subplots(figsize=(6, 8))
+                    ax.plot(profile, range(len(profile)), 'b-', linewidth=2)
+                    ax.set_ylabel('Position along shoe (toe to heel)')
+                    ax.set_xlabel('Average intensity')
+                    ax.set_title('DTW Profile (darkness across width)')
+                    ax.grid(True, alpha=0.3)
+                    ax.invert_yaxis()
+                    st.pyplot(fig)
+                    
+                    st.caption(f"Profile has {len(profile)} sample points")
+                    st.caption("This profile is compared using DTW to find similar shoe models")
+    
+    with tab5:
+        st.header("Configuration")
+        
+        with open('config.yaml', 'r') as f:
+            config_content = f.read()
+        
+        st.subheader("Current config.yaml:")
+        st.code(config_content, language='yaml')
+        
+        
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"**Feature Detection Confidence:** {config['models']['feature_detection']['confidence']}")
+            st.info(f"**DTW Distance Threshold:** {config['matching']['dtw']['distance_threshold']}")
+        with col2:
+            st.info(f"**Min Feature Matches:** {config['matching']['features']['min_matches']}")
+            st.info(f"**IoU Threshold:** {config['matching']['features']['iou_threshold']}")
+        
+        st.caption("To change these values, edit config.yaml and restart the app")
+
+if __name__ == "__main__":
+    main()
