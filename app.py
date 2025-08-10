@@ -39,15 +39,28 @@ def load_database():
     
     pipeline = load_pipeline()
     
-    for shoe_id in list(data['images'].keys())[:20]:
+    for shoe_id in data['images'].keys():
         for annotator in data['images'][shoe_id]:
+            left_added = False
+            right_added = False
             for print_id, image_path in data['images'][shoe_id][annotator].items():
-                try:
-                    results = pipeline.process_image(image_path)
-                    pipeline.add_to_database(shoe_id, results)
-                except Exception as e:
-                    st.warning(f"Failed to process {image_path}: {e}")
-                break
+                if 'L1' in print_id and not left_added:
+                    try:
+                        results = pipeline.process_image(image_path)
+                        pipeline.add_to_database(shoe_id, results)
+                        left_added = True
+                    except Exception as e:
+                        st.warning(f"Failed to process {image_path}: {e}")
+                elif 'P1' in print_id and not right_added:
+                    try:
+                        results = pipeline.process_image(image_path)
+                        pipeline.add_to_database(shoe_id, results)
+                        right_added = True
+                    except Exception as e:
+                        st.warning(f"Failed to process {image_path}: {e}")
+                
+                if left_added and right_added:
+                    break
             break
     
     return pipeline
@@ -55,10 +68,10 @@ def load_database():
 def main():
     st.title("🦶 Shoeprint Forensics System")
     
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Segmentation Demo", "Feature Detection", "Search", "Axis/DTW Demo", "Config"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Detection", "Feature Detection", "Search", "DTW Profile", "Config"])
     
     with tab1:
-        st.header("Shoe Segmentation")
+        st.header("Shoe Detection")
         
         uploaded_file = st.file_uploader("Upload a shoeprint image", type=['jpg', 'jpeg', 'png'])
         
@@ -74,19 +87,20 @@ def main():
                 st.subheader("Original Image")
                 st.image(image_np, use_column_width=True)
             
-            if pipeline.segmenter:
-                cropped, bbox = pipeline.segmenter.segment_shoe(image_np)
+            with col2:
+                st.subheader("Detection Results")
+                st.info("Working directly on uncropped images")
+                st.success("All processing happens on the full image without cropping or mirroring")
                 
-                with col2:
-                    st.subheader("Segmented Shoe")
-                    if bbox:
-                        st.image(cropped, use_column_width=True)
-                        st.success(f"Bounding box: {bbox}")
-                    else:
-                        st.warning("No shoe detected")
-            else:
-                with col2:
-                    st.warning("Segmentation model not loaded. Run train_models.py first.")
+                if pipeline.segmenter:
+                    st.caption("Segmentation model available but not used for cropping")
+                else:
+                    st.caption("No segmentation model loaded")
+                    
+                if pipeline.feature_detector:
+                    st.caption("Feature detection will work on the full image")
+                else:
+                    st.caption("Feature detection model not loaded")
     
     with tab2:
         st.header("Feature Detection")
@@ -126,27 +140,22 @@ def main():
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.subheader("Original/Cropped")
-                    if 'cropped_shoe' in results and results['shoe_bbox'] is not None:
-                        st.image(results['cropped_shoe'], use_column_width=True)
-                        st.caption("Showing cropped shoe region")
-                    else:
-                        st.image(image_np, use_column_width=True)
-                        st.caption("Showing original (no segmentation)")
+                    st.subheader("Original Image")
+                    st.image(image_np, use_column_width=True)
                 
                 with col2:
                     st.subheader("Detected Features")
                     if 'features' in results and results['features']:
-                        img_with_features = draw_features(results['cropped_shoe'], results['features'])
+                        img_with_features = draw_features(image_np, results['features'])
                         st.image(img_with_features, use_column_width=True)
                         st.info(f"Found {len(results['features'])} features")
                     else:
                         st.warning("No features detected")
                         
-                        st.caption(f"Image shape: {results['cropped_shoe'].shape}")
+                        st.caption(f"Image shape: {image_np.shape}")
                         st.caption(f"Using confidence: {confidence}")
                         if pipeline.segmenter:
-                            st.caption("Segmentation model loaded ✓")
+                            st.caption("Segmentation model loaded but not used for cropping ✓")
                         if pipeline.feature_detector:
                             st.caption("Feature model loaded ✓")
             else:
@@ -196,7 +205,7 @@ def main():
                         
                         
                         if query_features:
-                            query_with_features = draw_features(query_results['cropped_shoe'], query_features, color=(0, 255, 0))
+                            query_with_features = draw_features(image_np, query_features, color=(0, 255, 0))
                             st.caption("Query image with detected features (green):")
                             st.image(query_with_features, use_column_width=True)
                             st.info(f"Query has {len(query_features)} detected features")
@@ -211,9 +220,7 @@ def main():
                                     image_id, score, metadata = results[i + j]
                                     with cols[j]:
                                         
-                                        if 'cropped_shoe' in metadata and metadata['cropped_shoe'] is not None:
-                                            img = metadata['cropped_shoe']
-                                        elif 'original_image' in metadata:
+                                        if 'original_image' in metadata:
                                             img = metadata['original_image']
                                         else:
                                             img = cv2.imread(metadata['path'])
@@ -268,43 +275,36 @@ def main():
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.subheader("Original/Cropped")
-                if 'cropped_shoe' in results and results['shoe_bbox'] is not None:
-                    st.image(results['cropped_shoe'], use_column_width=True)
-                else:
-                    st.image(image_np, use_column_width=True)
+                st.subheader("Original Image")
+                st.image(image_np, use_column_width=True)
             
             with col2:
-                st.subheader("Current Axis (Center)")
+                st.subheader("Center Axis for DTW")
                 
-                if 'cropped_shoe' in results:
-                    img_with_axis = results['cropped_shoe'].copy()
-                    h, w = img_with_axis.shape[:2]
-                    
-                    cv2.line(img_with_axis, (w//2, 0), (w//2, h), (255, 0, 0), 3)
-                    st.image(img_with_axis, use_column_width=True)
-                    st.caption("Blue line: Center axis (currently used for DTW)")
+                img_with_axis = image_np.copy()
+                h, w = img_with_axis.shape[:2]
+                
+                cv2.line(img_with_axis, (w//2, 0), (w//2, h), (255, 0, 0), 3)
+                st.image(img_with_axis, use_column_width=True)
             
             with col3:
                 st.subheader("DTW Profile")
                 
-                if 'cropped_shoe' in results:
-                    from src.utils.image_ops import extract_axis_profile
-                    profile = pipeline._extract_profile_from_image(results['cropped_shoe'])
-                    
-                    
-                    import matplotlib.pyplot as plt
-                    fig, ax = plt.subplots(figsize=(6, 8))
-                    ax.plot(profile, range(len(profile)), 'b-', linewidth=2)
-                    ax.set_ylabel('Position along shoe (toe to heel)')
-                    ax.set_xlabel('Average intensity')
-                    ax.set_title('DTW Profile (darkness across width)')
-                    ax.grid(True, alpha=0.3)
-                    ax.invert_yaxis()
-                    st.pyplot(fig)
-                    
-                    st.caption(f"Profile has {len(profile)} sample points")
-                    st.caption("This profile is compared using DTW to find similar shoe models")
+                from src.utils.image_ops import extract_axis_profile
+                profile = pipeline._extract_profile_from_image(image_np)
+                
+                
+                import matplotlib.pyplot as plt
+                fig, ax = plt.subplots(figsize=(6, 8))
+                ax.plot(profile, range(len(profile)), 'b-', linewidth=2)
+                ax.set_ylabel('Position along image (top to bottom)')
+                ax.set_xlabel('Average intensity')
+                ax.set_title('DTW Profile (darkness across width)')
+                ax.grid(True, alpha=0.3)
+                ax.invert_yaxis()
+                st.pyplot(fig)
+                
+                st.caption(f"Profile has {len(profile)} sample points")
     
     with tab5:
         st.header("Configuration")

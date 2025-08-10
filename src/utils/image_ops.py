@@ -44,9 +44,6 @@ def extract_axis_profile(image: np.ndarray, axis_line: Tuple[Tuple[float, float]
     
     return np.array(profile)
 
-def mirror_image(image: np.ndarray) -> np.ndarray:
-    return cv2.flip(image, 1)
-
 def calculate_iou(box1: Tuple[float, float, float, float], 
                   box2: Tuple[float, float, float, float]) -> float:
     x1_min, y1_min, x1_max, y1_max = box1

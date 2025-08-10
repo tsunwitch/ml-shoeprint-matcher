@@ -6,7 +6,7 @@ import yaml
 
 from .models.segmentation import ShoeSegmenter
 from .models.detection import FeatureDetector
-from .utils.image_ops import extract_axis_profile, calculate_iou, mirror_image
+from .utils.image_ops import extract_axis_profile, calculate_iou
 from .matching.dtw_matcher import DTWMatcher
 from .matching.feature_matcher import FeatureMatcher
 
@@ -43,20 +43,15 @@ class ShoeprintPipeline:
             'image_path': image_path
         }
         
-        if self.segmenter:
-            cropped, bbox = self.segmenter.segment_shoe(image)
-            results['cropped_shoe'] = cropped
-            results['shoe_bbox'] = bbox
-        else:
-            results['cropped_shoe'] = image
-            results['shoe_bbox'] = None
+        results['cropped_shoe'] = image
+        results['shoe_bbox'] = None
         
         if self.feature_detector:
             confidence = self.config['models']['feature_detection']['confidence']
-            features = self.feature_detector.detect_features(results['cropped_shoe'], confidence=confidence)
+            features = self.feature_detector.detect_features(image, confidence=confidence)
             results['features'] = features
             
-            patches = self.feature_detector.extract_feature_patches(results['cropped_shoe'], features)
+            patches = self.feature_detector.extract_feature_patches(image, features)
             descriptors = self.feature_detector.compute_feature_descriptors(patches)
             results['feature_descriptors'] = descriptors
         
@@ -66,7 +61,7 @@ class ShoeprintPipeline:
         
         image_id = f"{shoe_id}_{Path(image_results['image_path']).stem}"
         
-        profile = self._extract_profile_from_image(image_results['cropped_shoe'])
+        profile = self._extract_profile_from_image(image_results['original_image'])
         
         self.database['profiles'][image_id] = profile
         self.database['features'][image_id] = {
@@ -76,7 +71,7 @@ class ShoeprintPipeline:
         self.database['metadata'][image_id] = {
             'shoe_id': shoe_id,
             'path': image_results['image_path'],
-            'cropped_shoe': image_results.get('cropped_shoe'),
+            'cropped_shoe': image_results.get('original_image'),
             'original_image': image_results.get('original_image'),
             'features': image_results.get('features', [])
         }
@@ -84,7 +79,7 @@ class ShoeprintPipeline:
     def search(self, query_image_path: str, top_k: int = 10) -> List[Tuple[str, float, Dict]]:
         query_results = self.process_image(query_image_path)
         
-        query_profile = self._extract_profile_from_image(query_results['cropped_shoe'])
+        query_profile = self._extract_profile_from_image(query_results['original_image'])
         
         
         dtw_scores = {}
