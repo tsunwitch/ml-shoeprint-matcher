@@ -38,6 +38,7 @@ matching:
   dtw:
     window_size: 1
     distance_threshold: 0.1
+    use_segmentation: true
   features:
     iou_threshold: 0.05
     min_matches: 3

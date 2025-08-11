@@ -284,7 +284,16 @@ def main():
                 img_with_axis = image_np.copy()
                 h, w = img_with_axis.shape[:2]
                 
-                cv2.line(img_with_axis, (w//2, 0), (w//2, h), (255, 0, 0), 3)
+                bbox = pipeline.get_segmentation_bbox(image_np)
+                if bbox is not None:
+                    x, y, bbox_w, bbox_h = bbox
+                    cv2.rectangle(img_with_axis, (x, y), (x + bbox_w, y + bbox_h), (0, 255, 0), 3)
+                    cv2.line(img_with_axis, (x + bbox_w//2, y), (x + bbox_w//2, y + bbox_h), (255, 0, 0), 3)
+                    st.caption("🟢 Green: Segmentation bounding box | 🔵 Blue: DTW axis")
+                else:
+                    cv2.line(img_with_axis, (w//2, 0), (w//2, h), (255, 0, 0), 3)
+                    st.caption("🔵 Blue: DTW axis (full image - no segmentation)")
+                
                 st.image(img_with_axis, use_column_width=True)
             
             with col3:
