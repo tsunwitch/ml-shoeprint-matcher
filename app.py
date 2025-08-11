@@ -285,8 +285,17 @@ def main():
                 img_with_axis = image_np.copy()
                 axis = results.get('axis', None)
                 if axis:
-                    img_with_axis = draw_axis(img_with_axis, axis, color=(0,0,255), thickness=3)
-                    st.caption("� Red: Detected longitudinal axis")
+                    # Draw axis in red
+                    img_with_axis = draw_axis(img_with_axis, axis, color=(255,0,0), thickness=3)
+                    # Draw heel/toe markers
+                    import cv2
+                    toe = tuple([int(c) for c in axis[0]])
+                    heel = tuple([int(c) for c in axis[1]])
+                    cv2.circle(img_with_axis, toe, 12, (255,255,0), -1)
+                    cv2.putText(img_with_axis, "Toe", (toe[0]+10, toe[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0), 2)
+                    cv2.circle(img_with_axis, heel, 12, (0,255,0), -1)
+                    cv2.putText(img_with_axis, "Heel", (heel[0]+10, heel[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+                    st.caption("🔴 Red: Detected longitudinal axis | � Yellow: Toe | � Green: Heel")
                 else:
                     st.warning("No axis detected. Is the axis model loaded?")
                 st.image(img_with_axis, use_column_width=True)
