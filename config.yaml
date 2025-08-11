@@ -20,13 +20,6 @@ models:
     imgsz: 640
     confidence: 0.5
 
-  axis_detection:
-    model_size: "yolov8m"
-    epochs: 100
-    batch_size: 16
-    imgsz: 640
-    confidence: 0.5
-
   feature_detection:
     model_size: "yolov8m"
     epochs: 150

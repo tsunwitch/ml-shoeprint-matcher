@@ -4,7 +4,6 @@ Legacy training script - now redirects to train_all_models.py
 For individual model training, use:
 - scripts/train_segmentation.py
 - scripts/train_feature_detection.py  
-- scripts/train_axis_detection.py
 """
 
 import sys
@@ -16,8 +15,7 @@ def main():
     print("Please use the new individual training scripts:")
     print("  🔧 Train segmentation:     python scripts/train_segmentation.py")
     print("  🔍 Train feature detection: python scripts/train_feature_detection.py")
-    print("  📐 Train axis detection:   python scripts/train_axis_detection.py")
-    print("  🚀 Train all models:       python scripts/train_all_models.py")
+    print("   Train all models:       python scripts/train_all_models.py")
     print()
     
     choice = input("Do you want to train all models now? [y/N]: ").lower().strip()
