@@ -20,13 +20,14 @@ def load_pipeline():
     
     seg_model = Path(config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
     feat_model = Path(config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
-    
-    if seg_model.exists():
-        pipeline.load_models(segmentation_path=str(seg_model))
-    
-    if feat_model.exists():
-        pipeline.load_models(feature_path=str(feat_model))
-    
+    axis_model = config.get('axis_model', None)
+
+    # Load all models in one call if possible
+    pipeline.load_models(
+        segmentation_path=str(seg_model) if seg_model.exists() else None,
+        feature_path=str(feat_model) if feat_model.exists() else None,
+        axis_path=axis_model if axis_model else None
+    )
     return pipeline
 
 @st.cache_resource
@@ -279,21 +280,15 @@ def main():
                 st.image(image_np, use_column_width=True)
             
             with col2:
-                st.subheader("Center Axis for DTW")
-                
+                st.subheader("Detected Axis")
+                from src.utils.visualization import draw_axis
                 img_with_axis = image_np.copy()
-                h, w = img_with_axis.shape[:2]
-                
-                bbox = pipeline.get_segmentation_bbox(image_np)
-                if bbox is not None:
-                    x, y, bbox_w, bbox_h = bbox
-                    cv2.rectangle(img_with_axis, (x, y), (x + bbox_w, y + bbox_h), (0, 255, 0), 3)
-                    cv2.line(img_with_axis, (x + bbox_w//2, y), (x + bbox_w//2, y + bbox_h), (255, 0, 0), 3)
-                    st.caption("🟢 Green: Segmentation bounding box | 🔵 Blue: DTW axis")
+                axis = results.get('axis', None)
+                if axis:
+                    img_with_axis = draw_axis(img_with_axis, axis, color=(0,0,255), thickness=3)
+                    st.caption("� Red: Detected longitudinal axis")
                 else:
-                    cv2.line(img_with_axis, (w//2, 0), (w//2, h), (255, 0, 0), 3)
-                    st.caption("🔵 Blue: DTW axis (full image - no segmentation)")
-                
+                    st.warning("No axis detected. Is the axis model loaded?")
                 st.image(img_with_axis, use_column_width=True)
             
             with col3:

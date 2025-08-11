@@ -14,50 +14,59 @@ class ShoeprintPipeline:
     def __init__(self, config_path: str = "config.yaml"):
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
-        
+
         self.segmenter = None
         self.feature_detector = None
+        self.axis_detector = None
         self.dtw_matcher = DTWMatcher(window_size=self.config['matching']['dtw']['window_size'])
         self.feature_matcher = FeatureMatcher(
             iou_threshold=self.config['matching']['features']['iou_threshold'],
             min_matches=self.config['matching']['features']['min_matches']
         )
-        
+
         self.database = {
             'profiles': {},
             'features': {},
             'metadata': {}
         }
     
-    def load_models(self, segmentation_path: Optional[str] = None, feature_path: Optional[str] = None):
+    def load_models(self, segmentation_path: Optional[str] = None, feature_path: Optional[str] = None, axis_path: Optional[str] = None):
         if segmentation_path:
             self.segmenter = ShoeSegmenter(segmentation_path)
-        
+
         if feature_path:
             self.feature_detector = FeatureDetector(feature_path)
+
+        if axis_path:
+            from .models.axis_detection import ShoeAxisDetector
+            self.axis_detector = ShoeAxisDetector(axis_path, device='cuda')
     
     def process_image(self, image_path: str) -> Dict:
         image = cv2.imread(image_path)
         if image is None:
             raise ValueError(f"Could not load image: {image_path}")
-        
+
         results = {
             'original_image': image,
             'image_path': image_path
         }
-        
+
         results['cropped_shoe'] = image
         results['shoe_bbox'] = None
-        
+
+        if self.axis_detector:
+            axis = self.axis_detector.detect_axis(image)
+            results['axis'] = axis
+
         if self.feature_detector:
             confidence = self.config['models']['feature_detection']['confidence']
             features = self.feature_detector.detect_features(image, confidence=confidence)
             results['features'] = features
-            
+
             patches = self.feature_detector.extract_feature_patches(image, features)
             descriptors = self.feature_detector.compute_feature_descriptors(patches)
             results['feature_descriptors'] = descriptors
-        
+
         return results
     
     def add_to_database(self, shoe_id: str, image_results: Dict):

@@ -5,6 +5,8 @@ paths:
   models: "trained_models"
   cache: "cache"
 
+axis_model: "trained_models/axis_detection/resnet50_axis.pth"
+
 data:
   image_size: [1690, 4660]
   train_split: 0.7
