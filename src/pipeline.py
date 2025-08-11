@@ -17,8 +17,11 @@ class ShoeprintPipeline:
         
         self.segmenter = None
         self.feature_detector = None
-        self.dtw_matcher = DTWMatcher()
-        self.feature_matcher = FeatureMatcher()
+        self.dtw_matcher = DTWMatcher(window_size=self.config['matching']['dtw']['window_size'])
+        self.feature_matcher = FeatureMatcher(
+            iou_threshold=self.config['matching']['features']['iou_threshold'],
+            min_matches=self.config['matching']['features']['min_matches']
+        )
         
         self.database = {
             'profiles': {},
@@ -92,9 +95,8 @@ class ShoeprintPipeline:
         
         
         if sorted_by_dtw:
-            best_dtw_score = sorted_by_dtw[0][1]
-            
-            dtw_threshold = best_dtw_score * 1.5
+            # Use config distance threshold instead of dynamic calculation
+            dtw_threshold = self.config['matching']['dtw']['distance_threshold']
             filtered_candidates = [img_id for img_id, score in sorted_by_dtw 
                                   if score <= dtw_threshold]
             

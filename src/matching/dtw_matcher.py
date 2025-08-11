@@ -18,7 +18,7 @@ class DTWMatcher:
         profile1_norm = profile1_norm.reshape(-1, 1)
         profile2_norm = profile2_norm.reshape(-1, 1)
         
-        distance, path = fastdtw(profile1_norm, profile2_norm, dist=euclidean)
+        distance, path = fastdtw(profile1_norm, profile2_norm, radius=self.window_size, dist=euclidean)
         
         normalized_distance = distance / len(profile1_norm)
         

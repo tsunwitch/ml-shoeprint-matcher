@@ -17,30 +17,30 @@ models:
     model_size: "yolov8m-seg"
     epochs: 100
     batch_size: 8
-    imgsz: 1280
+    imgsz: 640
     confidence: 0.5
 
   axis_detection:
     model_size: "yolov8m"
     epochs: 100
     batch_size: 16
-    imgsz: 1280
+    imgsz: 640
     confidence: 0.5
 
   feature_detection:
     model_size: "yolov8m"
     epochs: 150
     batch_size: 16
-    imgsz: 1280
+    imgsz: 640
     confidence: 0.20
 
 matching:
   dtw:
-    window_size: 10
-    distance_threshold: 0.3
+    window_size: 1
+    distance_threshold: 0.1
   features:
-    iou_threshold: 0.5
+    iou_threshold: 0.05
     min_matches: 3
   weights:
-    feature_weight: 0.8
-    dtw_weight: 0.2
+    feature_weight: 0.2
+    dtw_weight: 0.8
