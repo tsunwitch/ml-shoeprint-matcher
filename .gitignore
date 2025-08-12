@@ -253,6 +253,7 @@ $RECYCLE.BIN/
 marked_data/
 yolo_datasets/
 .old_models/
+images_for_docs/
 
 # Keep empty directories
 !.gitkeep

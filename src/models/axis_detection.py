@@ -5,22 +5,29 @@ import numpy as np
 import cv2
 
 class AxisRegressor(nn.Module):
-    def __init__(self):
+    def __init__(self, backbone_name='resnet50'):
         super().__init__()
-        self.backbone = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        if backbone_name == 'resnet18':
+            self.backbone = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        else:
+            self.backbone = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
         self.backbone.fc = nn.Linear(self.backbone.fc.in_features, 4)
 
     def forward(self, x):
         return self.backbone(x)
 
 class ShoeAxisDetector:
-    def __init__(self, model_path, device='cuda'):
+    def __init__(self, model_path, device='cuda', config_path='config.yaml'):
         self.device = device
-        self.model = AxisRegressor().to(self.device)
+        import yaml
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        backbone_name = config['models']['axis_detection'].get('backbone', 'resnet50')
+        self.model = AxisRegressor(backbone_name=backbone_name).to(self.device)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
         self.transform = transforms.Compose([
-            transforms.Resize((224, 224)),
+            transforms.Resize((config['models']['axis_detection'].get('img_size', 224), config['models']['axis_detection'].get('img_size', 224))),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])

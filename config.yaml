@@ -5,7 +5,7 @@ paths:
   models: "trained_models"
   cache: "cache"
 
-axis_model: "trained_models/axis_detection/resnet50_axis.pth"
+axis_model: "trained_models/axis_detection/resnet18_axis.pth"
 
 data:
   image_size: [1690, 4660]
@@ -22,12 +22,20 @@ models:
     imgsz: 640
     confidence: 0.5
 
-  feature_detection:
+  axis_detection:
+    model_path: "trained_models/axis_detection/resnet18_axis.pth"
     model_size: "yolov8m"
     epochs: 150
     batch_size: 16
     imgsz: 640
     confidence: 0.20
+
+  axis_detection:
+    epochs: 100
+    batch_size: 16
+    img_size: 640
+    lr: 0.0001
+    backbone: "resnet18"
 
 matching:
   dtw:
