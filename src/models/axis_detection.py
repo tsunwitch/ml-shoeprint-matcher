@@ -17,14 +17,15 @@ class AxisRegressor(nn.Module):
         return self.backbone(x)
 
 class ShoeAxisDetector:
-    def __init__(self, model_path, device='cuda', config_path='config.yaml'):
+    def __init__(self, device='cuda', config_path='config.yaml'):
         self.device = device
         import yaml
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
         backbone_name = config['models']['axis_detection'].get('backbone', 'resnet50')
         self.model = AxisRegressor(backbone_name=backbone_name).to(self.device)
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        axis_model_path = 'trained_models/axis_detection/axis.pth'
+        self.model.load_state_dict(torch.load(axis_model_path, map_location=self.device))
         self.model.eval()
         self.transform = transforms.Compose([
             transforms.Resize((config['models']['axis_detection'].get('img_size', 224), config['models']['axis_detection'].get('img_size', 224))),

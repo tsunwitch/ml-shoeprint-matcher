@@ -30,16 +30,15 @@ class ShoeprintPipeline:
             'metadata': {}
         }
     
-    def load_models(self, segmentation_path: Optional[str] = None, feature_path: Optional[str] = None, axis_path: Optional[str] = None):
+    def load_models(self, segmentation_path: Optional[str] = None, feature_path: Optional[str] = None):
         if segmentation_path:
             self.segmenter = ShoeSegmenter(segmentation_path)
 
         if feature_path:
             self.feature_detector = FeatureDetector(feature_path)
 
-        if axis_path:
-            from .models.axis_detection import ShoeAxisDetector
-            self.axis_detector = ShoeAxisDetector(axis_path, device='cuda')
+        from .models.axis_detection import ShoeAxisDetector
+        self.axis_detector = ShoeAxisDetector(device='cuda')
     
     def process_image(self, image_path: str) -> Dict:
         image = cv2.imread(image_path)

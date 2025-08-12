@@ -25,8 +25,7 @@ def load_pipeline():
     # Load all models in one call if possible
     pipeline.load_models(
         segmentation_path=str(seg_model) if seg_model.exists() else None,
-        feature_path=str(feat_model) if feat_model.exists() else None,
-        axis_path=axis_model if axis_model else None
+        feature_path=str(feat_model) if feat_model.exists() else None
     )
     return pipeline
 
