@@ -253,66 +253,35 @@ def main():
     
     with tab4:
         st.header("Axis Detection & DTW Profile")
-        
+        from src.matching.axis_detection import detect_shoe_axis
+        from src.utils.visualization import draw_axis
         uploaded_file4 = st.file_uploader("Upload image for axis visualization", type=['jpg', 'jpeg', 'png'], key="axis")
-        
         if uploaded_file4 is not None:
             image = Image.open(uploaded_file4)
             image_np = np.array(image)
-            
-            pipeline = load_pipeline()
-            
-            import tempfile
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
-                tmp_file.write(uploaded_file4.getbuffer())
-                tmp_path = tmp_file.name
-            
-            results = pipeline.process_image(tmp_path)
-            
-            import os
-            os.unlink(tmp_path)
-            
+            axis_line = detect_shoe_axis(image_np)
             col1, col2, col3 = st.columns(3)
-            
             with col1:
                 st.subheader("Original Image")
                 st.image(image_np, use_column_width=True)
-            
             with col2:
-                st.subheader("Center Axis for DTW")
-                
-                img_with_axis = image_np.copy()
-                h, w = img_with_axis.shape[:2]
-                
-                bbox = pipeline.get_segmentation_bbox(image_np)
-                if bbox is not None:
-                    x, y, bbox_w, bbox_h = bbox
-                    cv2.rectangle(img_with_axis, (x, y), (x + bbox_w, y + bbox_h), (0, 255, 0), 3)
-                    cv2.line(img_with_axis, (x + bbox_w//2, y), (x + bbox_w//2, y + bbox_h), (255, 0, 0), 3)
-                    st.caption("🟢 Green: Segmentation bounding box | 🔵 Blue: DTW axis")
-                else:
-                    cv2.line(img_with_axis, (w//2, 0), (w//2, h), (255, 0, 0), 3)
-                    st.caption("🔵 Blue: DTW axis (full image - no segmentation)")
-                
+                st.subheader("Detected Shoe Axis")
+                img_with_axis = draw_axis(image_np, axis_line, color=(255, 0, 0), thickness=4)
                 st.image(img_with_axis, use_column_width=True)
-            
+                st.caption(f"🔵 Blue: Detected axis from Canny/contour/PCA")
             with col3:
                 st.subheader("DTW Profile")
-                
                 from src.utils.image_ops import extract_axis_profile
-                profile = pipeline._extract_profile_from_image(image_np)
-                
-                
+                profile = extract_axis_profile(image_np, axis_line, num_samples=100)
                 import matplotlib.pyplot as plt
                 fig, ax = plt.subplots(figsize=(6, 8))
                 ax.plot(profile, range(len(profile)), 'b-', linewidth=2)
-                ax.set_ylabel('Position along image (top to bottom)')
+                ax.set_ylabel('Position along axis')
                 ax.set_xlabel('Average intensity')
-                ax.set_title('DTW Profile (darkness across width)')
+                ax.set_title('DTW Profile (along detected axis)')
                 ax.grid(True, alpha=0.3)
                 ax.invert_yaxis()
                 st.pyplot(fig)
-                
                 st.caption(f"Profile has {len(profile)} sample points")
     
     with tab5:
