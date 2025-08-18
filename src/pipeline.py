@@ -40,32 +40,81 @@ class ShoeprintPipeline:
         image = cv2.imread(image_path)
         if image is None:
             raise ValueError(f"Could not load image: {image_path}")
-        
+
         results = {
             'original_image': image,
             'image_path': image_path
         }
-        
+
         results['cropped_shoe'] = image
         results['shoe_bbox'] = None
-        
+
+        # Detect axis for normalization
+        try:
+            from .matching.axis_detection import detect_shoe_axis
+            axis_line = detect_shoe_axis(image)
+        except Exception as e:
+            h, w = image.shape[:2]
+            axis_line = ((w//2, 0), (w//2, h))
+        results['axis_line'] = axis_line
+
         if self.feature_detector:
             confidence = self.config['models']['feature_detection']['confidence']
             features = self.feature_detector.detect_features(image, confidence=confidence)
-            results['features'] = features
-            
+
+            # Store original features for visualization
+            results['features_original'] = features
+
+            # Normalize feature coordinates relative to axis for matching
+            norm_features = self._normalize_features(features, axis_line, image.shape)
+            results['features'] = norm_features
+
             patches = self.feature_detector.extract_feature_patches(image, features)
             descriptors = self.feature_detector.compute_feature_descriptors(patches)
             results['feature_descriptors'] = descriptors
-        
+
         return results
+
+    def _normalize_features(self, features, axis_line, image_shape):
+        # Transform feature coordinates to axis-relative frame
+        # axis_line: ((x1, y1), (x2, y2))
+        # image_shape: (h, w, ...)
+        if not features:
+            return []
+        (x1, y1), (x2, y2) = axis_line
+        cx = (x1 + x2) / 2
+        cy = (y1 + y2) / 2
+        dx = x2 - x1
+        dy = y2 - y1
+        axis_angle = np.arctan2(dy, dx)
+        cos_a = np.cos(-axis_angle)
+        sin_a = np.sin(-axis_angle)
+        h, w = image_shape[:2]
+        scale = max(h, w)
+        norm_features = []
+        for box in features:
+            x1b, y1b, x2b, y2b = box
+            # Center box coordinates
+            x1b -= cx
+            y1b -= cy
+            x2b -= cx
+            y2b -= cy
+            # Rotate
+            x1r = x1b * cos_a - y1b * sin_a
+            y1r = x1b * sin_a + y1b * cos_a
+            x2r = x2b * cos_a - y2b * sin_a
+            y2r = x2b * sin_a + y2b * cos_a
+            # Scale to [-1, 1] range
+            x1r /= scale
+            y1r /= scale
+            x2r /= scale
+            y2r /= scale
+            norm_features.append((x1r, y1r, x2r, y2r))
+        return norm_features
     
     def add_to_database(self, shoe_id: str, image_results: Dict):
-        
         image_id = f"{shoe_id}_{Path(image_results['image_path']).stem}"
-        
         profile = self._extract_profile_from_image(image_results['original_image'])
-        
         self.database['profiles'][image_id] = profile
         self.database['features'][image_id] = {
             'boxes': image_results.get('features', []),
@@ -76,7 +125,9 @@ class ShoeprintPipeline:
             'path': image_results['image_path'],
             'cropped_shoe': image_results.get('original_image'),
             'original_image': image_results.get('original_image'),
-            'features': image_results.get('features', [])
+            'features': image_results.get('features', []),
+            'features_original': image_results.get('features_original', []),
+            'axis_line': image_results.get('axis_line', None)
         }
     
     def search(self, query_image_path: str, top_k: int = 10) -> List[Tuple[str, float, Dict]]:
@@ -140,9 +191,9 @@ class ShoeprintPipeline:
     
     def _extract_profile_from_image(self, image: np.ndarray) -> np.ndarray:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
-        
-        if (self.config['matching']['dtw']['use_segmentation'] and 
-            self.segmenter is not None):
+
+        # Optionally crop to segmentation mask
+        if (self.config['matching']['dtw']['use_segmentation'] and self.segmenter is not None):
             try:
                 _, bbox = self.segmenter.segment_shoe(image)
                 if bbox is not None:
@@ -150,12 +201,16 @@ class ShoeprintPipeline:
                     gray = gray[y:y+h, x:x+w]
             except Exception as e:
                 print(f"Segmentation failed, using full image: {e}")
-        
-        h, w = gray.shape
-        axis_line = ((w//2, 0), (w//2, h))
-        
+
+        # Detect axis using axis detection
+        try:
+            from .matching.axis_detection import detect_shoe_axis
+            axis_line = detect_shoe_axis(gray)
+        except Exception as e:
+            h, w = gray.shape
+            axis_line = ((w//2, 0), (w//2, h))
+
         profile = extract_axis_profile(gray, axis_line, num_samples=100)
-        
         return profile
     
     def get_segmentation_bbox(self, image: np.ndarray) -> Optional[Tuple]:

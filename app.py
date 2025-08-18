@@ -193,63 +193,107 @@ def main():
                     
                     query_results = pipeline.process_image(temp_path)
                     query_features = query_results.get('features', [])
+                    query_features_vis = query_results.get('features_original', [])
                     
                     results = pipeline.search(temp_path, top_k=10)
-                    
                     
                     import os
                     os.unlink(temp_path)
                     
                     with col2:
-                        st.subheader("Top 10 Matches")
-                        
-                        
-                        if query_features:
-                            query_with_features = draw_features(image_np, query_features, color=(0, 255, 0))
-                            st.caption("Query image with detected features (green):")
-                            st.image(query_with_features, use_column_width=True)
-                            st.info(f"Query has {len(query_features)} detected features")
-                        
+                        st.subheader("Query Features & DTW Profile")
+                        qcol1, qcol2, qcol3 = st.columns(3)
+                        with qcol1:
+                            # Unified overlay: segmentation mask, axis, features (blue)
+                            from src.utils.visualization import draw_mask_overlay, draw_axis, draw_features
+                            mask = None
+                            axis_line = query_results.get('axis_line', None)
+                            if pipeline.segmenter:
+                                mask = pipeline.segmenter.get_shoe_mask(image_np)
+                            img_with_overlay = image_np.copy()
+                            if mask is not None:
+                                img_with_overlay = draw_mask_overlay(img_with_overlay, mask, color=(0,255,0), alpha=0.3)
+                            if axis_line is not None:
+                                img_with_overlay = draw_axis(img_with_overlay, axis_line, color=(255,0,0), thickness=4)
+                            if query_features_vis:
+                                img_with_overlay = draw_features(img_with_overlay, query_features_vis, color=(0, 0, 255))
+                            st.image(img_with_overlay, use_column_width=True)
+                            st.caption("Segmentation mask (green), detected axis (red), and features (blue boxes)")
+                        with qcol2:
+                            from src.utils.image_ops import extract_axis_profile
+                            axis_line = query_results.get('axis_line', None)
+                            if axis_line is not None:
+                                profile = extract_axis_profile(image_np, axis_line, num_samples=100)
+                                import matplotlib.pyplot as plt
+                                fig, ax = plt.subplots(figsize=(4, 6))
+                                ax.plot(profile, range(len(profile)), 'g-', linewidth=2)
+                                ax.set_ylabel('Position along axis')
+                                ax.set_xlabel('Average intensity')
+                                ax.set_title('Query DTW Profile')
+                                ax.grid(True, alpha=0.3)
+                                ax.invert_yaxis()
+                                st.pyplot(fig)
                         st.divider()
-                        
-                        
+                        st.subheader("Top 10 Matches")
                         for i in range(0, len(results), 2):
                             cols = st.columns(2)
                             for j in range(2):
                                 if i + j < len(results):
                                     image_id, score, metadata = results[i + j]
-                                    with cols[j]:
-                                        
+                                    mcol1, mcol2 = cols[j].columns(2)
+                                    with mcol1:
+                                        # Show segmentation mask and axis for match
+                                        from src.utils.visualization import draw_mask_overlay, draw_axis
                                         if 'original_image' in metadata:
                                             img = metadata['original_image']
                                         else:
                                             img = cv2.imread(metadata['path'])
                                             if img is not None:
                                                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                                        
-                                        
-                                        if img is not None and 'features' in metadata and metadata['features']:
-                                            img_with_features = draw_features(img, metadata['features'], color=(255, 0, 0))
-                                            st.image(img_with_features, use_column_width=True)
-                                            feature_count = len(metadata['features'])
-                                        else:
-                                            if img is not None:
-                                                st.image(img, use_column_width=True)
-                                                feature_count = 0
+                                        axis_line = metadata.get('axis_line', None)
+                                        mask = None
+                                        if pipeline.segmenter and img is not None:
+                                            mask = pipeline.segmenter.get_shoe_mask(img)
+                                        img_with_overlay = img.copy() if img is not None else None
+                                        features_vis = metadata.get('features_original', [])
+                                        if img_with_overlay is not None:
+                                            if mask is not None:
+                                                img_with_overlay = draw_mask_overlay(img_with_overlay, mask, color=(0,255,0), alpha=0.3)
+                                            if axis_line is not None:
+                                                img_with_overlay = draw_axis(img_with_overlay, axis_line, color=(255,0,0), thickness=4)
+                                            if features_vis:
+                                                img_with_overlay = draw_features(img_with_overlay, features_vis, color=(0, 0, 255))
+                                                feature_count = len(features_vis)
                                             else:
                                                 feature_count = 0
-                                        
+                                            st.image(img_with_overlay, use_column_width=True)
+                                            st.caption("Segmentation mask (green), detected axis (red), and features (blue boxes)")
+                                        else:
+                                            feature_count = 0
                                         st.caption(f"#{i+j+1}: {image_id}")
                                         st.caption(f"Score: {score:.3f}")
                                         st.caption(f"Features: {feature_count}")
-                                        
-                                        
                                         if query_features and metadata.get('features'):
                                             matches = pipeline.feature_matcher.match_features(
                                                 query_features, 
                                                 metadata['features']
                                             )
                                             st.caption(f"Matching features: {matches}/{len(query_features)}")
+                                    with mcol2:
+                                        from src.utils.image_ops import extract_axis_profile
+                                        axis_line = metadata.get('axis_line', None)
+                                        match_img = metadata.get('original_image', None)
+                                        if match_img is not None and axis_line is not None:
+                                            profile = extract_axis_profile(match_img, axis_line, num_samples=100)
+                                            import matplotlib.pyplot as plt
+                                            fig, ax = plt.subplots(figsize=(4, 6))
+                                            ax.plot(profile, range(len(profile)), 'r-', linewidth=2)
+                                            ax.set_ylabel('Position along axis')
+                                            ax.set_xlabel('Average intensity')
+                                            ax.set_title('Match DTW Profile')
+                                            ax.grid(True, alpha=0.3)
+                                            ax.invert_yaxis()
+                                            st.pyplot(fig)
     
     with tab4:
         st.header("Axis Detection & DTW Profile")
