@@ -192,15 +192,12 @@ class ShoeprintPipeline:
     def _extract_profile_from_image(self, image: np.ndarray) -> np.ndarray:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
 
-        # Optionally crop to segmentation mask
+        mask = None
         if (self.config['matching']['dtw']['use_segmentation'] and self.segmenter is not None):
             try:
-                _, bbox = self.segmenter.segment_shoe(image)
-                if bbox is not None:
-                    x, y, w, h = bbox
-                    gray = gray[y:y+h, x:x+w]
+                mask = self.segmenter.get_shoe_mask(image)
             except Exception as e:
-                print(f"Segmentation failed, using full image: {e}")
+                print(f"Segmentation mask failed, using full image: {e}")
 
         # Detect axis using axis detection
         try:
@@ -210,7 +207,7 @@ class ShoeprintPipeline:
             h, w = gray.shape
             axis_line = ((w//2, 0), (w//2, h))
 
-        profile = extract_axis_profile(gray, axis_line, num_samples=100)
+        profile = extract_axis_profile(gray, axis_line, num_samples=100, mask=mask)
         return profile
     
     def get_segmentation_bbox(self, image: np.ndarray) -> Optional[Tuple]:

@@ -222,8 +222,12 @@ def main():
                         with qcol2:
                             from src.utils.image_ops import extract_axis_profile
                             axis_line = query_results.get('axis_line', None)
+                            mask = None
+                            pipeline = load_pipeline()
+                            if pipeline.segmenter:
+                                mask = pipeline.segmenter.get_shoe_mask(image_np)
                             if axis_line is not None:
-                                profile = extract_axis_profile(image_np, axis_line, num_samples=100)
+                                profile = extract_axis_profile(image_np, axis_line, num_samples=100, mask=mask)
                                 import matplotlib.pyplot as plt
                                 fig, ax = plt.subplots(figsize=(4, 6))
                                 ax.plot(profile, range(len(profile)), 'g-', linewidth=2)
@@ -283,8 +287,12 @@ def main():
                                         from src.utils.image_ops import extract_axis_profile
                                         axis_line = metadata.get('axis_line', None)
                                         match_img = metadata.get('original_image', None)
+                                        mask = None
+                                        pipeline = load_pipeline()
+                                        if pipeline.segmenter and match_img is not None:
+                                            mask = pipeline.segmenter.get_shoe_mask(match_img)
                                         if match_img is not None and axis_line is not None:
-                                            profile = extract_axis_profile(match_img, axis_line, num_samples=100)
+                                            profile = extract_axis_profile(match_img, axis_line, num_samples=100, mask=mask)
                                             import matplotlib.pyplot as plt
                                             fig, ax = plt.subplots(figsize=(4, 6))
                                             ax.plot(profile, range(len(profile)), 'r-', linewidth=2)
