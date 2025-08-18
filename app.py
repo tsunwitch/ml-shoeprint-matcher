@@ -227,15 +227,17 @@ def main():
                             if pipeline.segmenter:
                                 mask = pipeline.segmenter.get_shoe_mask(image_np)
                             if axis_line is not None:
-                                profile = extract_axis_profile(image_np, axis_line, num_samples=100, mask=mask)
+                                left_profile, right_profile = extract_axis_profile(image_np, axis_line, num_samples=100, mask=mask)
                                 import matplotlib.pyplot as plt
                                 fig, ax = plt.subplots(figsize=(4, 6))
-                                ax.plot(profile, range(len(profile)), 'g-', linewidth=2)
+                                ax.plot(left_profile, range(len(left_profile)), 'g-', linewidth=2, label='Left')
+                                ax.plot(right_profile, range(len(right_profile)), 'b-', linewidth=2, label='Right')
                                 ax.set_ylabel('Position along axis')
                                 ax.set_xlabel('Average intensity')
-                                ax.set_title('Query DTW Profile')
+                                ax.set_title('Query DTW Profiles (Left/Right)')
                                 ax.grid(True, alpha=0.3)
                                 ax.invert_yaxis()
+                                ax.legend()
                                 st.pyplot(fig)
                         st.divider()
                         st.subheader("Top 10 Matches")
@@ -292,15 +294,17 @@ def main():
                                         if pipeline.segmenter and match_img is not None:
                                             mask = pipeline.segmenter.get_shoe_mask(match_img)
                                         if match_img is not None and axis_line is not None:
-                                            profile = extract_axis_profile(match_img, axis_line, num_samples=100, mask=mask)
+                                            left_profile, right_profile = extract_axis_profile(match_img, axis_line, num_samples=100, mask=mask)
                                             import matplotlib.pyplot as plt
                                             fig, ax = plt.subplots(figsize=(4, 6))
-                                            ax.plot(profile, range(len(profile)), 'r-', linewidth=2)
+                                            ax.plot(left_profile, range(len(left_profile)), 'r-', linewidth=2, label='Left')
+                                            ax.plot(right_profile, range(len(right_profile)), 'm-', linewidth=2, label='Right')
                                             ax.set_ylabel('Position along axis')
                                             ax.set_xlabel('Average intensity')
-                                            ax.set_title('Match DTW Profile')
+                                            ax.set_title('Match DTW Profiles (Left/Right)')
                                             ax.grid(True, alpha=0.3)
                                             ax.invert_yaxis()
+                                            ax.legend()
                                             st.pyplot(fig)
     
     with tab4:

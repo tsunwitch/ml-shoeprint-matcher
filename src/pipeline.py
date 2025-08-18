@@ -114,8 +114,11 @@ class ShoeprintPipeline:
     
     def add_to_database(self, shoe_id: str, image_results: Dict):
         image_id = f"{shoe_id}_{Path(image_results['image_path']).stem}"
-        profile = self._extract_profile_from_image(image_results['original_image'])
-        self.database['profiles'][image_id] = profile
+        left_profile, right_profile = self._extract_profile_from_image(image_results['original_image'])
+        self.database['profiles'][image_id] = {
+            'left': left_profile,
+            'right': right_profile
+        }
         self.database['features'][image_id] = {
             'boxes': image_results.get('features', []),
             'descriptors': image_results.get('feature_descriptors', np.array([]))
@@ -132,64 +135,51 @@ class ShoeprintPipeline:
     
     def search(self, query_image_path: str, top_k: int = 10) -> List[Tuple[str, float, Dict]]:
         query_results = self.process_image(query_image_path)
-        
-        query_profile = self._extract_profile_from_image(query_results['original_image'])
-        
-        
+        query_left, query_right = self._extract_profile_from_image(query_results['original_image'])
+
         dtw_scores = {}
-        for image_id, profile in self.database['profiles'].items():
-            distance = self.dtw_matcher.compute_distance(query_profile, profile)
-            dtw_scores[image_id] = distance
-        
-        
+        for image_id, profiles in self.database['profiles'].items():
+            left_dist = self.dtw_matcher.compute_distance(query_left, profiles['left'])
+            right_dist = self.dtw_matcher.compute_distance(query_right, profiles['right'])
+            avg_dist = (left_dist + right_dist) / 2.0
+            dtw_scores[image_id] = avg_dist
+
         sorted_by_dtw = sorted(dtw_scores.items(), key=lambda x: x[1])
-        
-        
+
         if sorted_by_dtw:
-            # Use config distance threshold instead of dynamic calculation
             dtw_threshold = self.config['matching']['dtw']['distance_threshold']
             filtered_candidates = [img_id for img_id, score in sorted_by_dtw 
                                   if score <= dtw_threshold]
-            
-            
             if len(filtered_candidates) < top_k * 2:
                 filtered_candidates = [img_id for img_id, _ in sorted_by_dtw[:top_k * 2]]
         else:
             filtered_candidates = list(self.database['profiles'].keys())
-        
+
         print(f"Stage 1: DTW filtering reduced {len(self.database['profiles'])} images to {len(filtered_candidates)} candidates")
-        
-        
+
         feature_scores = {}
         query_features = query_results.get('features', [])
-        
+
         for image_id in filtered_candidates:
             db_features = self.database['features'][image_id]['boxes']
             matches = self.feature_matcher.match_features(query_features, db_features)
             feature_scores[image_id] = matches
-        
-        
+
         final_scores = {}
         for image_id in filtered_candidates:
-            
             feature_weight = self.config['matching']['weights'].get('feature_weight', 0.8)
             dtw_weight = self.config['matching']['weights'].get('dtw_weight', 0.2)
-            
-            
             dtw_norm = 1.0 / (1.0 + dtw_scores[image_id])
             feature_norm = feature_scores.get(image_id, 0) / max(1, len(query_features))
-            
             final_scores[image_id] = feature_weight * feature_norm + dtw_weight * dtw_norm
-        
-        
+
         results = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
-        
+
         print(f"Stage 2: Returning top {len(results)} matches based on feature similarity")
-        
-        
+
         return [(image_id, score, self.database['metadata'][image_id]) for image_id, score in results]
     
-    def _extract_profile_from_image(self, image: np.ndarray) -> np.ndarray:
+    def _extract_profile_from_image(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
 
         mask = None
@@ -207,8 +197,8 @@ class ShoeprintPipeline:
             h, w = gray.shape
             axis_line = ((w//2, 0), (w//2, h))
 
-        profile = extract_axis_profile(gray, axis_line, num_samples=100, mask=mask)
-        return profile
+        left_profile, right_profile = extract_axis_profile(gray, axis_line, num_samples=100, mask=mask)
+        return left_profile, right_profile
     
     def get_segmentation_bbox(self, image: np.ndarray) -> Optional[Tuple]:
         if (self.config['matching']['dtw']['use_segmentation'] and 

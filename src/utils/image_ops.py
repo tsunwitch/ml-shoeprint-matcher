@@ -19,34 +19,57 @@ def enhance_contrast(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
 
 def extract_axis_profile(image: np.ndarray, axis_line: Tuple[Tuple[float, float], Tuple[float, float]], 
-                         num_samples: int = 100, mask: Optional[np.ndarray] = None) -> np.ndarray:
+                         num_samples: int = 100, mask: Optional[np.ndarray] = None) -> Tuple[np.ndarray, np.ndarray]:
     start_point, end_point = axis_line
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
-    profile = []
+    left_profile = []
+    right_profile = []
+    # Compute axis direction
+    dx = end_point[0] - start_point[0]
+    dy = end_point[1] - start_point[1]
+    axis_length = np.hypot(dx, dy)
+    if axis_length == 0:
+        axis_vec = np.array([1, 0])
+    else:
+        axis_vec = np.array([dx, dy]) / axis_length
+    # Perpendicular direction
+    perp_vec = np.array([-axis_vec[1], axis_vec[0]])
+    window_size = 10
     for i in range(num_samples):
         t = i / (num_samples - 1)
-        x = int(start_point[0] + t * (end_point[0] - start_point[0]))
-        y = int(start_point[1] + t * (end_point[1] - start_point[1]))
-        window_size = 10
-        x_min = max(0, x - window_size)
-        x_max = min(image.shape[1], x + window_size)
-        y_min = max(0, y - window_size)
-        y_max = min(image.shape[0], y + window_size)
-        window = gray[y_min:y_max, x_min:x_max]
+        x = int(start_point[0] + t * dx)
+        y = int(start_point[1] + t * dy)
+        # Sample left and right windows
+        left_cx = int(x - perp_vec[0] * window_size)
+        left_cy = int(y - perp_vec[1] * window_size)
+        right_cx = int(x + perp_vec[0] * window_size)
+        right_cy = int(y + perp_vec[1] * window_size)
+        # Extract left window
+        lx_min = max(0, left_cx - window_size)
+        lx_max = min(image.shape[1], left_cx + window_size)
+        ly_min = max(0, left_cy - window_size)
+        ly_max = min(image.shape[0], left_cy + window_size)
+        left_window = gray[ly_min:ly_max, lx_min:lx_max]
+        # Extract right window
+        rx_min = max(0, right_cx - window_size)
+        rx_max = min(image.shape[1], right_cx + window_size)
+        ry_min = max(0, right_cy - window_size)
+        ry_max = min(image.shape[0], right_cy + window_size)
+        right_window = gray[ry_min:ry_max, rx_min:rx_max]
+        # Masking
         if mask is not None:
-            mask_window = mask[y_min:y_max, x_min:x_max]
-            valid_pixels = window[mask_window > 0].astype(float)
-            if valid_pixels.size > 0:
-                profile.append(float(np.mean(valid_pixels)))
-            else:
-                profile.append(0.0)
+            left_mask = mask[ly_min:ly_max, lx_min:lx_max]
+            right_mask = mask[ry_min:ry_max, rx_min:rx_max]
+            left_valid = left_window[left_mask > 0].astype(float)
+            right_valid = right_window[right_mask > 0].astype(float)
+            left_profile.append(float(np.mean(left_valid)) if left_valid.size > 0 else 0.0)
+            right_profile.append(float(np.mean(right_valid)) if right_valid.size > 0 else 0.0)
         else:
-            window_float = window.astype(float)
-            if window_float.size > 0:
-                profile.append(float(np.mean(window_float)))
-            else:
-                profile.append(0.0)
-    return np.array(profile)
+            left_window_float = left_window.astype(float)
+            right_window_float = right_window.astype(float)
+            left_profile.append(float(np.mean(left_window_float)) if left_window_float.size > 0 else 0.0)
+            right_profile.append(float(np.mean(right_window_float)) if right_window_float.size > 0 else 0.0)
+    return np.array(left_profile), np.array(right_profile)
 
 def calculate_iou(box1: Tuple[float, float, float, float], 
                   box2: Tuple[float, float, float, float]) -> float:
