@@ -32,9 +32,9 @@ class ShoeprintPipeline:
     def load_models(self, segmentation_path: Optional[str] = None, feature_path: Optional[str] = None):
         if segmentation_path:
             self.segmenter = ShoeSegmenter(segmentation_path)
-        
         if feature_path:
-            self.feature_detector = FeatureDetector(feature_path)
+            use_sahi = self.config['models']['feature_detection'].get('use_sahi', False)
+            self.feature_detector = FeatureDetector(feature_path, use_sahi=use_sahi)
     
     def process_image(self, image_path: str) -> Dict:
         image = cv2.imread(image_path)

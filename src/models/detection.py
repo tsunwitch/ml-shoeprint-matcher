@@ -4,25 +4,46 @@ from ultralytics import YOLO
 from typing import List, Optional, Tuple
 
 class FeatureDetector:
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: Optional[str] = None, use_sahi: bool = False):
         self.model = None
+        self.use_sahi = use_sahi
         if model_path:
             self.load_model(model_path)
     
     def load_model(self, model_path: str):
-        self.model = YOLO(model_path)
+        if self.use_sahi:
+            from sahi.model import Yolov8DetectionModel
+            self.model = Yolov8DetectionModel(model_path=model_path, confidence_threshold=0.3, device="cpu")
+        else:
+            self.model = YOLO(model_path)
     
     def detect_features(self, image: np.ndarray, confidence: float = 0.7) -> List[Tuple[float, float, float, float]]:
         if self.model is None:
             raise ValueError("Model not loaded")
         
-        results = self.model(image, conf=confidence)
-        
         features = []
-        if len(results) > 0 and results[0].boxes is not None:
-            for box in results[0].boxes:
-                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+        if self.use_sahi:
+            from sahi.utils.cv import read_image_as_pil
+            from sahi.predict import get_sliced_prediction
+            pil_img = read_image_as_pil(image)
+            result = get_sliced_prediction(
+                pil_img,
+                self.model,
+                slice_height=512,
+                slice_width=512,
+                overlap_height_ratio=0.2,
+                overlap_width_ratio=0.2,
+            )
+            for det in result.object_prediction_list:
+                x1, y1, x2, y2 = det.bbox.minx, det.bbox.miny, det.bbox.maxx, det.bbox.maxy
                 features.append((float(x1), float(y1), float(x2), float(y2)))
+        else:
+            results = self.model(image, conf=confidence)
+            
+            if len(results) > 0 and results[0].boxes is not None:
+                for box in results[0].boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    features.append((float(x1), float(y1), float(x2), float(y2)))
         
         return features
     
