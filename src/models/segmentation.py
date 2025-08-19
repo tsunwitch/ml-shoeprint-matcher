@@ -32,8 +32,8 @@ class ShoeSegmenter:
             if contours:
                 largest_contour = max(contours, key=cv2.contourArea)
                 x, y, w, h = cv2.boundingRect(largest_contour)
-                # Horizontal margin to fix unnecessary cropping
-                margin = int(0.05 * w)
+                # Increased horizontal margin to fix unnecessary cropping
+                margin = int(0.90 * w)
                 x_new = max(x - margin, 0)
                 w_new = min(w + 2 * margin, image.shape[1] - x_new)
                 cropped = image[y:y+h, x_new:x_new+w_new]
@@ -51,17 +51,23 @@ class ShoeSegmenter:
         
         return image, None
     
-    def get_shoe_mask(self, image: np.ndarray, confidence: float = 0.5) -> np.ndarray:
+    def get_shoe_mask(self, image: np.ndarray, confidence: float = 0.5, horizontal_margin_ratio: float = 0.1) -> np.ndarray:
         if self.model is None:
             raise ValueError("Model not loaded")
-        
+
         results = self.model(image, conf=confidence)
-        
+
         mask = np.zeros(image.shape[:2], dtype=np.uint8)
-        
+
         if len(results) > 0 and results[0].masks is not None:
             result_mask = results[0].masks[0].data.cpu().numpy()[0]
             mask = cv2.resize(result_mask, (image.shape[1], image.shape[0]))
             mask = (mask > 0.5).astype(np.uint8) * 255
-        
+
+            # Dilate horizontally to match margin
+            h, w = mask.shape
+            margin = int(horizontal_margin_ratio * w)
+            kernel = np.ones((1, max(1, margin)), np.uint8)
+            mask = cv2.dilate(mask, kernel, iterations=1)
+
         return mask

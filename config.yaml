@@ -19,6 +19,7 @@ models:
     batch_size: 8
     imgsz: 640
     confidence: 0.5
+  horizontal_margin_ratio: 0.1
 
   axis_detection:
     model_size: "yolov8m"

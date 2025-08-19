@@ -210,7 +210,10 @@ def main():
                             mask = None
                             axis_line = query_results.get('axis_line', None)
                             if pipeline.segmenter:
-                                mask = pipeline.segmenter.get_shoe_mask(image_np)
+                                with open('config.yaml', 'r') as f:
+                                    config = yaml.safe_load(f)
+                                margin_ratio = config['models']['shoe_segmentation'].get('horizontal_margin_ratio', 0.1)
+                                mask = pipeline.segmenter.get_shoe_mask(image_np, horizontal_margin_ratio=margin_ratio)
                             img_with_overlay = image_np.copy()
                             if mask is not None:
                                 img_with_overlay = draw_mask_overlay(img_with_overlay, mask, color=(0,255,0), alpha=0.3)
@@ -219,14 +222,17 @@ def main():
                             if query_features_vis:
                                 img_with_overlay = draw_features(img_with_overlay, query_features_vis, color=(0, 0, 255))
                             st.image(img_with_overlay, use_column_width=True)
-                            st.caption("Segmentation mask (green), detected axis (red), and features (blue boxes)")
+                            st.caption("Segmentation mask (green) is exactly the region used for DTW profile extraction. Axis (red), features (blue boxes)")
                         with qcol2:
                             from src.utils.image_ops import extract_axis_profile
                             axis_line = query_results.get('axis_line', None)
                             mask = None
                             pipeline = load_pipeline()
                             if pipeline.segmenter:
-                                mask = pipeline.segmenter.get_shoe_mask(image_np)
+                                with open('config.yaml', 'r') as f:
+                                    config = yaml.safe_load(f)
+                                margin_ratio = config['models']['shoe_segmentation'].get('horizontal_margin_ratio', 0.1)
+                                mask = pipeline.segmenter.get_shoe_mask(image_np, horizontal_margin_ratio=margin_ratio)
                             if axis_line is not None:
                                 left_profile, right_profile = extract_axis_profile(image_np, axis_line, num_samples=100, mask=mask)
                                 import matplotlib.pyplot as plt
