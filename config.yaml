@@ -33,7 +33,7 @@ models:
     epochs: 150
     batch_size: 16
     imgsz: 640
-    confidence: 0.10
+    confidence: 0.20
   use_sahi: true
 
 matching:

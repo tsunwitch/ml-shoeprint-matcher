@@ -85,7 +85,7 @@ def main():
             
             with col1:
                 st.subheader("Original Image")
-                st.image(image_np, use_column_width=True)
+                st.image(image_np, use_container_width=True)
             
             with col2:
                 st.subheader("Detection Results")
@@ -97,7 +97,7 @@ def main():
                     margin_ratio = config['models']['shoe_segmentation'].get('horizontal_margin_ratio', 0.1)
                     mask = pipeline.segmenter.get_shoe_mask(image_np, horizontal_margin_ratio=margin_ratio)
                     img_with_mask = draw_mask_overlay(image_np, mask, color=(0,255,0), alpha=0.3)
-                    st.image(img_with_mask, use_column_width=True)
+                    st.image(img_with_mask, use_container_width=True)
                     st.caption("Segmentation mask (green overlay)")
                 else:
                     st.caption("No segmentation model loaded")
@@ -146,14 +146,14 @@ def main():
                 
                 with col1:
                     st.subheader("Original Image")
-                    st.image(image_np, use_column_width=True)
+                    st.image(image_np, use_container_width=True)
                 
                 with col2:
                     st.subheader("Detected Features")
                     if 'features' in results and results['features']:
                         from src.utils.visualization import draw_features
                         img_with_features = draw_features(image_np, results['features'])
-                        st.image(img_with_features, use_column_width=True)
+                        st.image(img_with_features, use_container_width=True)
                         st.info(f"Found {len(results['features'])} features")
                     else:
                         st.warning("No features detected")
@@ -184,7 +184,7 @@ def main():
             col1, col2 = st.columns([1, 2])
             with col1:
                 st.subheader("Query Image")
-                st.image(image_np, use_column_width=True)
+                st.image(image_np, use_container_width=True)
             
             if st.button("Search"):
                 pipeline = load_database()
@@ -226,7 +226,7 @@ def main():
                                 img_with_overlay = draw_axis(img_with_overlay, axis_line, color=(255,0,0), thickness=4)
                             if query_features_vis:
                                 img_with_overlay = draw_features(img_with_overlay, query_features_vis, color=(0, 0, 255))
-                            st.image(img_with_overlay, use_column_width=True)
+                            st.image(img_with_overlay, use_container_width=True)
                             st.caption("Segmentation mask (green) is exactly the region used for DTW profile extraction. Axis (red), features (blue boxes)")
                         with qcol2:
                             from src.utils.image_ops import extract_axis_profile
@@ -284,7 +284,7 @@ def main():
                                                 feature_count = len(features_vis)
                                             else:
                                                 feature_count = 0
-                                            st.image(img_with_overlay, use_column_width=True)
+                                            st.image(img_with_overlay, use_container_width=True)
                                             st.caption("Segmentation mask (green), detected axis (red), and features (blue boxes)")
                                         else:
                                             feature_count = 0
@@ -331,11 +331,11 @@ def main():
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.subheader("Original Image")
-                st.image(image_np, use_column_width=True)
+                st.image(image_np, use_container_width=True)
             with col2:
                 st.subheader("Detected Shoe Axis")
                 img_with_axis = draw_axis(image_np, axis_line, color=(255, 0, 0), thickness=4)
-                st.image(img_with_axis, use_column_width=True)
+                st.image(img_with_axis, use_container_width=True)
                 st.caption(f"🔵 Blue: Detected axis from Canny/contour/PCA")
             with col3:
                 st.subheader("DTW Profile")
