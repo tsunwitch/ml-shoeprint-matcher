@@ -146,6 +146,7 @@ def main():
                 with col2:
                     st.subheader("Detected Features")
                     if 'features' in results and results['features']:
+                        from src.utils.visualization import draw_features
                         img_with_features = draw_features(image_np, results['features'])
                         st.image(img_with_features, use_column_width=True)
                         st.info(f"Found {len(results['features'])} features")
