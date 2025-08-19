@@ -89,14 +89,19 @@ def main():
             
             with col2:
                 st.subheader("Detection Results")
-                st.info("Working directly on uncropped images")
-                st.success("All processing happens on the full image without cropping or mirroring")
                 
                 if pipeline.segmenter:
-                    st.caption("Segmentation model available but not used for cropping")
+                    from src.utils.visualization import draw_mask_overlay
+                    with open('config.yaml', 'r') as f:
+                        config = yaml.safe_load(f)
+                    margin_ratio = config['models']['shoe_segmentation'].get('horizontal_margin_ratio', 0.1)
+                    mask = pipeline.segmenter.get_shoe_mask(image_np, horizontal_margin_ratio=margin_ratio)
+                    img_with_mask = draw_mask_overlay(image_np, mask, color=(0,255,0), alpha=0.3)
+                    st.image(img_with_mask, use_column_width=True)
+                    st.caption("Segmentation mask (green overlay)")
                 else:
                     st.caption("No segmentation model loaded")
-                    
+                
                 if pipeline.feature_detector:
                     st.caption("Feature detection will work on the full image")
                 else:
