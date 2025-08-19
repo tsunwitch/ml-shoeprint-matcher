@@ -19,8 +19,8 @@ class ShoeprintPipeline:
         self.feature_detector = None
         self.dtw_matcher = DTWMatcher(window_size=self.config['matching']['dtw']['window_size'])
         self.feature_matcher = FeatureMatcher(
-            iou_threshold=self.config['matching']['features']['iou_threshold'],
-            min_matches=self.config['matching']['features']['min_matches']
+            distance_threshold=self.config['matching']['features'].get('distance_threshold', 30.0),
+            min_matches=self.config['matching']['features'].get('min_matches', 3)
         )
         
         self.database = {
