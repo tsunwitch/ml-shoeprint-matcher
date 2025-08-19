@@ -17,6 +17,31 @@ class FeatureDetector:
         else:
             self.model = YOLO(model_path)
     
+    def merge_overlapping_features(self, features: List[Tuple[float, float, float, float]], iou_threshold: float = 0.5) -> List[Tuple[float, float, float, float]]:
+        from src.utils.image_ops import calculate_iou
+        merged = []
+        used = set()
+        for i, box1 in enumerate(features):
+            if i in used:
+                continue
+            group = [box1]
+            for j, box2 in enumerate(features):
+                if i != j and j not in used:
+                    if calculate_iou(box1, box2) > iou_threshold:
+                        group.append(box2)
+                        used.add(j)
+            # Merge group into one box (average coordinates)
+            if len(group) == 1:
+                merged.append(group[0])
+            else:
+                x1 = np.mean([b[0] for b in group])
+                y1 = np.mean([b[1] for b in group])
+                x2 = np.mean([b[2] for b in group])
+                y2 = np.mean([b[3] for b in group])
+                merged.append((x1, y1, x2, y2))
+            used.add(i)
+        return merged
+
     def detect_features(self, image: np.ndarray, confidence: float = 0.7) -> List[Tuple[float, float, float, float]]:
         if self.model is None:
             raise ValueError("Model not loaded")
@@ -44,7 +69,8 @@ class FeatureDetector:
                 for box in results[0].boxes:
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                     features.append((float(x1), float(y1), float(x2), float(y2)))
-        
+        # Merge overlapping features
+        features = self.merge_overlapping_features(features, iou_threshold=0.5)
         return features
     
     def extract_feature_patches(self, image: np.ndarray, features: List[Tuple]) -> List[np.ndarray]:
