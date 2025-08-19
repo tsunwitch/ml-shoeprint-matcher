@@ -17,3 +17,4 @@ streamlit>=1.28.0
 pyyaml>=6.0
 tqdm>=4.65.0
 fastdtw>=0.3.4
+sahi>=0.11.15
