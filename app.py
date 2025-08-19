@@ -360,7 +360,7 @@ def main():
             st.info(f"**DTW Distance Threshold:** {config['matching']['dtw']['distance_threshold']}")
         with col2:
             st.info(f"**Min Feature Matches:** {config['matching']['features']['min_matches']}")
-            st.info(f"**IoU Threshold:** {config['matching']['features']['iou_threshold']}")
+            st.info(f"**Distance Threshold:** {config['matching']['features']['distance_threshold']}")
         
         st.caption("To change these values, edit config.yaml and restart the app")
 
