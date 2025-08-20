@@ -143,11 +143,9 @@ def main():
                 os.unlink(tmp_path)
                 
                 col1, col2 = st.columns(2)
-                
                 with col1:
                     st.subheader("Original Image")
                     st.image(image_np, use_container_width=True)
-                
                 with col2:
                     st.subheader("Detected Features")
                     if 'features' in results and results['features']:
@@ -157,7 +155,6 @@ def main():
                         st.info(f"Found {len(results['features'])} features")
                     else:
                         st.warning("No features detected")
-                        
                         st.caption(f"Image shape: {image_np.shape}")
                         st.caption(f"Using confidence: {confidence}")
                         if pipeline.segmenter:
@@ -340,17 +337,19 @@ def main():
             with col3:
                 st.subheader("DTW Profile")
                 from src.utils.image_ops import extract_axis_profile
-                profile = extract_axis_profile(image_np, axis_line, num_samples=100)
+                left_profile, right_profile = extract_axis_profile(image_np, axis_line, num_samples=100)
                 import matplotlib.pyplot as plt
-                fig, ax = plt.subplots(figsize=(6, 8))
-                ax.plot(profile, range(len(profile)), 'b-', linewidth=2)
+                fig, ax = plt.subplots(figsize=(4, 6))
+                ax.plot(left_profile, range(len(left_profile)), 'g-', linewidth=2, label='Left')
+                ax.plot(right_profile, range(len(right_profile)), 'b-', linewidth=2, label='Right')
                 ax.set_ylabel('Position along axis')
                 ax.set_xlabel('Average intensity')
-                ax.set_title('DTW Profile (along detected axis)')
+                ax.set_title('DTW Profiles (Left/Right)')
                 ax.grid(True, alpha=0.3)
                 ax.invert_yaxis()
+                ax.legend()
                 st.pyplot(fig)
-                st.caption(f"Profile has {len(profile)} sample points")
+                st.caption(f"Left profile: {len(left_profile)} points, Right profile: {len(right_profile)} points")
     
     with tab5:
         st.header("Configuration")
