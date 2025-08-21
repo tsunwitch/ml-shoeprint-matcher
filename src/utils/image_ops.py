@@ -19,7 +19,7 @@ def enhance_contrast(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
 
 def extract_axis_profile(image: np.ndarray, axis_line: Tuple[Tuple[float, float], Tuple[float, float]], 
-                         num_samples: int = 100, mask: Optional[np.ndarray] = None) -> Tuple[np.ndarray, np.ndarray]:
+                         num_samples: int = 100, mask: Optional[np.ndarray] = None, window_size: int = 10) -> Tuple[np.ndarray, np.ndarray]:
     start_point, end_point = axis_line
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
     left_profile = []
@@ -34,7 +34,6 @@ def extract_axis_profile(image: np.ndarray, axis_line: Tuple[Tuple[float, float]
         axis_vec = np.array([dx, dy]) / axis_length
     # Perpendicular direction
     perp_vec = np.array([-axis_vec[1], axis_vec[0]])
-    window_size = 10
     for i in range(num_samples):
         t = i / (num_samples - 1)
         x = int(start_point[0] + t * dx)

@@ -197,7 +197,8 @@ class ShoeprintPipeline:
             h, w = gray.shape
             axis_line = ((w//2, 0), (w//2, h))
 
-        left_profile, right_profile = extract_axis_profile(gray, axis_line, num_samples=100, mask=mask)
+        window_size = self.config['matching'].get('profile_window_size', 10)
+        left_profile, right_profile = extract_axis_profile(gray, axis_line, num_samples=100, mask=mask, window_size=window_size)
         return left_profile, right_profile
     
     def get_segmentation_bbox(self, image: np.ndarray) -> Optional[Tuple]:

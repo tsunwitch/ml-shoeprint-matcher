@@ -34,6 +34,7 @@ matching:
     window_size: 1
     distance_threshold: 0.1
     use_segmentation: true
+  profile_window_size: 300 # Window size for DTW profile extraction (pixels)
   features:
     distance_threshold: 0.1
     min_matches: 0
