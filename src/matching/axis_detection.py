@@ -50,7 +50,8 @@ def axis_detection_pipeline(image: np.ndarray):
     all_pts = np.vstack([cnt.reshape(-1, 2) for cnt in large_contours])
     M = cv2.moments(all_pts)
     if M["m00"] == 0:
-        cx, cy = np.mean(all_pts, axis=0).tolist()
+        mean_pt = np.mean(all_pts.astype(np.float32), axis=0)
+        cx, cy = float(mean_pt[0]), float(mean_pt[1])
     else:
         cx = int(M["m10"] / M["m00"])
         cy = int(M["m01"] / M["m00"])
