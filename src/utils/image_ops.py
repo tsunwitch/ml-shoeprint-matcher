@@ -24,7 +24,6 @@ def extract_axis_profile(image: np.ndarray, axis_line: Tuple[Tuple[float, float]
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
     left_profile = []
     right_profile = []
-    # Compute axis direction
     dx = end_point[0] - start_point[0]
     dy = end_point[1] - start_point[1]
     axis_length = np.hypot(dx, dy)
@@ -32,30 +31,25 @@ def extract_axis_profile(image: np.ndarray, axis_line: Tuple[Tuple[float, float]
         axis_vec = np.array([1, 0])
     else:
         axis_vec = np.array([dx, dy]) / axis_length
-    # Perpendicular direction
     perp_vec = np.array([-axis_vec[1], axis_vec[0]])
     for i in range(num_samples):
         t = i / (num_samples - 1)
         x = int(start_point[0] + t * dx)
         y = int(start_point[1] + t * dy)
-        # Sample left and right windows
         left_cx = int(x - perp_vec[0] * window_size)
         left_cy = int(y - perp_vec[1] * window_size)
         right_cx = int(x + perp_vec[0] * window_size)
         right_cy = int(y + perp_vec[1] * window_size)
-        # Extract left window
         lx_min = max(0, left_cx - window_size)
         lx_max = min(image.shape[1], left_cx + window_size)
         ly_min = max(0, left_cy - window_size)
         ly_max = min(image.shape[0], left_cy + window_size)
         left_window = gray[ly_min:ly_max, lx_min:lx_max]
-        # Extract right window
         rx_min = max(0, right_cx - window_size)
         rx_max = min(image.shape[1], right_cx + window_size)
         ry_min = max(0, right_cy - window_size)
         ry_max = min(image.shape[0], right_cy + window_size)
         right_window = gray[ry_min:ry_max, rx_min:rx_max]
-        # Masking
         if mask is not None:
             left_mask = mask[ly_min:ly_max, lx_min:lx_max]
             right_mask = mask[ry_min:ry_max, rx_min:rx_max]

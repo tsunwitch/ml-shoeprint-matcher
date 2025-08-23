@@ -207,7 +207,6 @@ def main():
                         st.subheader("Query Features & DTW Profile")
                         qcol1, qcol2, qcol3 = st.columns(3)
                         with qcol1:
-                            # Unified overlay: segmentation mask, axis, features (blue)
                             from src.utils.visualization import draw_mask_overlay, draw_axis, draw_features
                             mask = None
                             axis_line = query_results.get('axis_line', None)
@@ -257,7 +256,6 @@ def main():
                                     image_id, score, metadata = results[i + j]
                                     mcol1, mcol2 = cols[j].columns(2)
                                     with mcol1:
-                                        # Show segmentation mask and axis for match
                                         from src.utils.visualization import draw_mask_overlay, draw_axis
                                         if 'original_image' in metadata:
                                             img = metadata['original_image']
@@ -324,7 +322,14 @@ def main():
         if uploaded_file4 is not None:
             image = Image.open(uploaded_file4)
             image_np = np.array(image)
-            axis_line = detect_shoe_axis(image_np)
+            pipeline = load_pipeline()
+            mask = None
+            if pipeline.segmenter:
+                with open('config.yaml', 'r') as f:
+                    config = yaml.safe_load(f)
+                margin_ratio = config['models']['shoe_segmentation'].get('horizontal_margin_ratio', 0.1)
+                mask = pipeline.segmenter.get_shoe_mask(image_np, horizontal_margin_ratio=margin_ratio)
+            axis_line = detect_shoe_axis(image_np, mask=mask)
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.subheader("Original Image")
@@ -351,7 +356,6 @@ def main():
                 st.pyplot(fig)
                 st.caption(f"Left profile: {len(left_profile)} points, Right profile: {len(right_profile)} points")
 
-            # Show preprocessing steps side-by-side
             st.markdown("### Axis Detection Preprocessing Steps")
             steps = get_axis_preprocessing_steps(image_np)
             step_cols = st.columns(len(steps))

@@ -62,10 +62,8 @@ class ShoeprintPipeline:
             confidence = self.config['models']['feature_detection']['confidence']
             features = self.feature_detector.detect_features(image, confidence=confidence)
 
-            # Store original features for visualization
             results['features_original'] = features
 
-            # Normalize feature coordinates relative to axis for matching
             norm_features = self._normalize_features(features, axis_line, image.shape)
             results['features'] = norm_features
 
@@ -76,9 +74,6 @@ class ShoeprintPipeline:
         return results
 
     def _normalize_features(self, features, axis_line, image_shape):
-        # Transform feature coordinates to axis-relative frame
-        # axis_line: ((x1, y1), (x2, y2))
-        # image_shape: (h, w, ...)
         if not features:
             return []
         (x1, y1), (x2, y2) = axis_line
@@ -94,17 +89,14 @@ class ShoeprintPipeline:
         norm_features = []
         for box in features:
             x1b, y1b, x2b, y2b = box
-            # Center box coordinates
             x1b -= cx
             y1b -= cy
             x2b -= cx
             y2b -= cy
-            # Rotate
             x1r = x1b * cos_a - y1b * sin_a
             y1r = x1b * sin_a + y1b * cos_a
             x2r = x2b * cos_a - y2b * sin_a
             y2r = x2b * sin_a + y2b * cos_a
-            # Scale to [-1, 1] range
             x1r /= scale
             y1r /= scale
             x2r /= scale
