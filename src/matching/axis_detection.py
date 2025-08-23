@@ -3,25 +3,50 @@ import numpy as np
 from typing import Tuple
 from sklearn.decomposition import PCA
 
-def detect_shoe_axis(image: np.ndarray) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+def get_axis_preprocessing_steps(image: np.ndarray):
     """
-    Detects the main axis of the shoeprint using Canny, contours, moments, and PCA.
-    Returns: ((x1, y1), (x2, y2)) endpoints of the axis line
+    Returns a dict of intermediate images for axis detection: grayscale, blur, edges, closing.
     """
+    steps = {}
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image.copy()
+    steps['Grayscale'] = gray
     blur = cv2.GaussianBlur(gray, (7, 7), 0)
+    steps['Gaussian Blur'] = blur
     edges = cv2.Canny(blur, 50, 150)
+    steps['Canny Edges'] = edges
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
     closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    steps['Morphological Closing'] = closed
+    return steps
+
+
+def axis_detection_pipeline(image: np.ndarray):
+    """
+    Processes image for axis detection, returns dict of steps and axis endpoints.
+    Returns: steps (dict), axis_line ((x1, y1), (x2, y2))
+    """
+    steps = {}
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image.copy()
+    steps['Grayscale'] = gray
+    blur = cv2.GaussianBlur(gray, (7, 7), 0)
+    steps['Gaussian Blur'] = blur
+    edges = cv2.Canny(blur, 50, 150)
+    steps['Canny Edges'] = edges
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    steps['Morphological Closing'] = closed
+
     contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         h, w = image.shape[:2]
-        return ((w//2, 0), (w//2, h))
+        axis_line = ((w//2, 0), (w//2, h))
+        return steps, axis_line
     min_area = 0.01 * (image.shape[0] * image.shape[1])
     large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_area]
     if not large_contours:
         h, w = image.shape[:2]
-        return ((w//2, 0), (w//2, h))
+        axis_line = ((w//2, 0), (w//2, h))
+        return steps, axis_line
     all_pts = np.vstack([cnt.reshape(-1, 2) for cnt in large_contours])
     M = cv2.moments(all_pts)
     if M["m00"] == 0:
@@ -48,6 +73,15 @@ def detect_shoe_axis(image: np.ndarray) -> Tuple[Tuple[float, float], Tuple[floa
             points.append((px, py))
     if len(points) >= 2:
         points = sorted(list(set(points)))
-        return (points[0], points[-1])
+        axis_line = (points[0], points[-1])
     else:
-        return ((x, y), (x + w, y + h))
+        axis_line = ((x, y), (x + w, y + h))
+    return steps, axis_line
+
+
+def detect_shoe_axis(image: np.ndarray):
+    """
+    Returns only the axis endpoints, for compatibility.
+    """
+    _, axis_line = axis_detection_pipeline(image)
+    return axis_line

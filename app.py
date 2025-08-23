@@ -318,7 +318,7 @@ def main():
     
     with tab4:
         st.header("Axis Detection & DTW Profile")
-        from src.matching.axis_detection import detect_shoe_axis
+        from src.matching.axis_detection import detect_shoe_axis, get_axis_preprocessing_steps
         from src.utils.visualization import draw_axis
         uploaded_file4 = st.file_uploader("Upload image for axis visualization", type=['jpg', 'jpeg', 'png'], key="axis")
         if uploaded_file4 is not None:
@@ -350,6 +350,17 @@ def main():
                 ax.legend()
                 st.pyplot(fig)
                 st.caption(f"Left profile: {len(left_profile)} points, Right profile: {len(right_profile)} points")
+
+            # Show preprocessing steps side-by-side
+            st.markdown("### Axis Detection Preprocessing Steps")
+            steps = get_axis_preprocessing_steps(image_np)
+            step_cols = st.columns(len(steps))
+            for idx, (step_name, step_img) in enumerate(steps.items()):
+                with step_cols[idx]:
+                    if step_img.ndim == 2:
+                        st.image(step_img, caption=step_name, use_container_width=True)
+                    else:
+                        st.image(step_img, caption=step_name, use_container_width=True, channels="RGB")
     
     with tab5:
         st.header("Configuration")
