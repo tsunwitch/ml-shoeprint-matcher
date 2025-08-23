@@ -49,10 +49,15 @@ class ShoeprintPipeline:
         results['cropped_shoe'] = image
         results['shoe_bbox'] = None
 
-        # Detect axis for normalization
+        mask = None
+        if (self.config['matching']['dtw']['use_segmentation'] and self.segmenter is not None):
+            try:
+                mask = self.segmenter.get_shoe_mask(image)
+            except Exception as e:
+                print(f"Segmentation mask failed, using full image: {e}")
         try:
             from .matching.axis_detection import detect_shoe_axis
-            axis_line = detect_shoe_axis(image)
+            axis_line = detect_shoe_axis(image, mask=mask)
         except Exception as e:
             h, w = image.shape[:2]
             axis_line = ((w//2, 0), (w//2, h))
@@ -181,10 +186,10 @@ class ShoeprintPipeline:
             except Exception as e:
                 print(f"Segmentation mask failed, using full image: {e}")
 
-        # Detect axis using axis detection
+        # Detect axis using mask-based axis detection
         try:
             from .matching.axis_detection import detect_shoe_axis
-            axis_line = detect_shoe_axis(gray)
+            axis_line = detect_shoe_axis(gray, mask=mask)
         except Exception as e:
             h, w = gray.shape
             axis_line = ((w//2, 0), (w//2, h))

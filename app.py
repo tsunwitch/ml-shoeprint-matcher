@@ -316,7 +316,7 @@ def main():
     
     with tab4:
         st.header("Axis Detection & DTW Profile")
-        from src.matching.axis_detection import detect_shoe_axis, get_axis_preprocessing_steps
+        from src.matching.axis_detection import detect_shoe_axis
         from src.utils.visualization import draw_axis
         uploaded_file4 = st.file_uploader("Upload image for axis visualization", type=['jpg', 'jpeg', 'png'], key="axis")
         if uploaded_file4 is not None:
@@ -338,7 +338,7 @@ def main():
                 st.subheader("Detected Shoe Axis")
                 img_with_axis = draw_axis(image_np, axis_line, color=(255, 0, 0), thickness=4)
                 st.image(img_with_axis, use_container_width=True)
-                st.caption(f"🔵 Blue: Detected axis from Canny/contour/PCA")
+                st.caption(f"🔵 Blue: Detected axis from mask-based detection")
             with col3:
                 st.subheader("DTW Profile")
                 from src.utils.image_ops import extract_axis_profile
@@ -355,16 +355,7 @@ def main():
                 ax.legend()
                 st.pyplot(fig)
                 st.caption(f"Left profile: {len(left_profile)} points, Right profile: {len(right_profile)} points")
-
-            st.markdown("### Axis Detection Preprocessing Steps")
-            steps = get_axis_preprocessing_steps(image_np)
-            step_cols = st.columns(len(steps))
-            for idx, (step_name, step_img) in enumerate(steps.items()):
-                with step_cols[idx]:
-                    if step_img.ndim == 2:
-                        st.image(step_img, caption=step_name, use_container_width=True)
-                    else:
-                        st.image(step_img, caption=step_name, use_container_width=True, channels="RGB")
+            # Axis preprocessing steps removed; only mask-based axis detection is used now.
     
     with tab5:
         st.header("Configuration")
