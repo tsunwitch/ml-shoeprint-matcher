@@ -3,6 +3,7 @@ import sys
 import json
 from pathlib import Path
 from src.pipeline import ShoeprintPipeline
+import argparse
 
 def index(folder, output_json):
     pipeline = ShoeprintPipeline("config.yaml")
@@ -63,7 +64,7 @@ def index(folder, output_json):
             print(f"Failed: {img_path} ({e})")
     print(f"Done. Saved to {output_json}")
 
-def search(db_json, query_image):
+def search(db_json, query_image, top_k=10):
     pipeline = ShoeprintPipeline("config.yaml")
     seg_model = Path(pipeline.config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
     feat_model = Path(pipeline.config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
@@ -73,26 +74,32 @@ def search(db_json, query_image):
         pipeline.load_models(feature_path=str(feat_model))
     with open(db_json, 'r') as f:
         pipeline.database = json.load(f)
-    results = pipeline.search(query_image, top_k=10)
+    results = pipeline.search(query_image, top_k=top_k)
     print("Rank | Image ID         | Score    | Image Path")
     print("----------------------------------------------------------")
     for idx, (image_id, score, metadata) in enumerate(results, 1):
         print(f"{idx:4} | {image_id:15} | {score:8.3f} | {metadata.get('path', '')}")
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python cli.py <index/search> ...")
-        sys.exit(1)
-    cmd = sys.argv[1]
-    if cmd == "index" and len(sys.argv) == 4:
-        index(sys.argv[2], sys.argv[3])
-    elif cmd == "search" and len(sys.argv) == 4:
-        search(sys.argv[2], sys.argv[3])
-    else:
-        print("Usage:")
-        print("  python cli.py index <folder> <output_json>")
-        print("  python cli.py search <db_json> <query_image>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Shoeprint Matcher CLI')
+    subparsers = parser.add_subparsers(dest='command')
 
-if __name__ == "__main__":
+    index_parser = subparsers.add_parser('index', help='Index shoeprint images in a folder')
+    index_parser.add_argument('folder', help='Path to folder with shoeprint images')
+    index_parser.add_argument('db', help='Path to output JSON database')
+
+    search_parser = subparsers.add_parser('search', help='Search for best matches to a query image')
+    search_parser.add_argument('db', help='Path to JSON database')
+    search_parser.add_argument('query', help='Path to query shoeprint image')
+    search_parser.add_argument('--top', type=int, default=10, help='Number of top matches to display')
+
+    args = parser.parse_args()
+    if args.command == 'index':
+        index(args.folder, args.db)
+    elif args.command == 'search':
+        search(args.db, args.query, args.top)
+    else:
+        parser.print_help()
+
+if __name__ == '__main__':
     main()
