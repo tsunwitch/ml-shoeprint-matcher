@@ -6,6 +6,19 @@ from pathlib import Path
 from src.pipeline import ShoeprintPipeline
 import argparse
 
+def make_json_serializable(obj):
+    import numpy as np
+    if isinstance(obj, dict):
+        return {k: make_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [make_json_serializable(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple(make_json_serializable(v) for v in obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    else:
+        return obj
+
 def index(folder, output_json):
     pipeline = ShoeprintPipeline("config.yaml")
     seg_model = Path(pipeline.config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
@@ -20,18 +33,6 @@ def index(folder, output_json):
     image_paths = []
     for ext in exts:
         image_paths.extend(folder.rglob(ext))
-    def make_json_serializable(obj):
-        import numpy as np
-        if isinstance(obj, dict):
-            return {k: make_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [make_json_serializable(v) for v in obj]
-        elif isinstance(obj, tuple):
-            return tuple(make_json_serializable(v) for v in obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        else:
-            return obj
 
     for img_path in image_paths:
         print(f"DEBUG: Processing image: {img_path}")
@@ -100,6 +101,25 @@ def search(db_json, query_image, top_k=10):
                     writer.writerow([idx, image_id, score, metadata.get('path', '')])
             print(f"Results saved to {output_file}")
 
+    # Add query image to database if requested
+    if hasattr(search, 'add_query') and search.add_query:
+        already_present = any(meta.get('path', '') == query_image for meta in pipeline.database.get('metadata', {}).values())
+        if already_present:
+            print(f"Query image already in database, not adding: {query_image}")
+        else:
+            results_query = pipeline.process_image(query_image)
+            shoe_id = Path(query_image).parent.name
+            pipeline.add_to_database(shoe_id, results_query)
+            for meta in pipeline.database.get('metadata', {}).values():
+                if 'original_image' in meta:
+                    meta['original_image'] = None
+                if 'cropped_shoe' in meta:
+                    meta['cropped_shoe'] = None
+            serializable_db = make_json_serializable(pipeline.database)
+            with open(db_json, 'w') as f:
+                json.dump(serializable_db, f)
+            print(f"Query image added to database: {query_image}")
+
 def main():
     parser = argparse.ArgumentParser(description='Shoeprint Matcher CLI')
     subparsers = parser.add_subparsers(dest='command')
@@ -113,16 +133,15 @@ def main():
     search_parser.add_argument('query', help='Path to query shoeprint image')
     search_parser.add_argument('--top', type=int, default=10, help='Number of top matches to display')
     search_parser.add_argument('--output', help='Path to output CSV or JSON file with matches')
+    search_parser.add_argument('--add-query', action='store_true', help='Add query image to database after searching')
 
     args = parser.parse_args()
     if args.command == 'index':
         index(args.folder, args.db)
     elif args.command == 'search':
-        # Pass output file to search function using attribute
-        if args.output:
-            search.output_file = args.output
-        else:
-            search.output_file = None
+        # Pass output file and add_query to search function using attributes
+        search.output_file = args.output if args.output else None
+        search.add_query = args.add_query if args.add_query else False
         search(args.db, args.query, args.top)
     else:
         parser.print_help()
