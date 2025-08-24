@@ -20,7 +20,8 @@ def make_json_serializable(obj):
         return obj
 
 def index(folder, output_json):
-    pipeline = ShoeprintPipeline("config.yaml")
+    config_path = index.config_path if hasattr(index, 'config_path') and index.config_path else "config.yaml"
+    pipeline = ShoeprintPipeline(config_path)
     seg_model = Path(pipeline.config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
     feat_model = Path(pipeline.config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
     if seg_model.exists():
@@ -67,7 +68,8 @@ def index(folder, output_json):
     print(f"Done. Saved to {output_json}")
 
 def search(db_json, query_image, top_k=10):
-    pipeline = ShoeprintPipeline("config.yaml")
+    config_path = search.config_path if hasattr(search, 'config_path') and search.config_path else "config.yaml"
+    pipeline = ShoeprintPipeline(config_path)
     seg_model = Path(pipeline.config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
     feat_model = Path(pipeline.config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
     if seg_model.exists():
@@ -127,6 +129,7 @@ def main():
     index_parser = subparsers.add_parser('index', help='Index shoeprint images in a folder')
     index_parser.add_argument('folder', help='Path to folder with shoeprint images')
     index_parser.add_argument('db', help='Path to output JSON database')
+    index_parser.add_argument('--config', help='Path to config file (default: config.yaml)')
 
     search_parser = subparsers.add_parser('search', help='Search for best matches to a query image')
     search_parser.add_argument('db', help='Path to JSON database')
@@ -134,12 +137,14 @@ def main():
     search_parser.add_argument('--top', type=int, default=10, help='Number of top matches to display')
     search_parser.add_argument('--output', help='Path to output CSV or JSON file with matches')
     search_parser.add_argument('--add-query', action='store_true', help='Add query image to database after searching')
+    search_parser.add_argument('--config', help='Path to config file (default: config.yaml)')
 
     args = parser.parse_args()
     if args.command == 'index':
+        index.config_path = args.config if args.config else None
         index(args.folder, args.db)
     elif args.command == 'search':
-        # Pass output file and add_query to search function using attributes
+        search.config_path = args.config if args.config else None
         search.output_file = args.output if args.output else None
         search.add_query = args.add_query if args.add_query else False
         search(args.db, args.query, args.top)
