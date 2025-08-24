@@ -1,6 +1,7 @@
 # Dead simple CLI for shoeprint matching
 import sys
 import json
+import csv
 from pathlib import Path
 from src.pipeline import ShoeprintPipeline
 import argparse
@@ -80,6 +81,25 @@ def search(db_json, query_image, top_k=10):
     for idx, (image_id, score, metadata) in enumerate(results, 1):
         print(f"{idx:4} | {image_id:15} | {score:8.3f} | {metadata.get('path', '')}")
 
+    # Save results to file if requested
+    if hasattr(search, 'output_file') and search.output_file:
+        output_file = search.output_file
+        if output_file.lower().endswith('.json'):
+            out = [
+                {'rank': idx, 'image_id': image_id, 'score': score, 'image_path': metadata.get('path', '')}
+                for idx, (image_id, score, metadata) in enumerate(results, 1)
+            ]
+            with open(output_file, 'w') as f:
+                json.dump(out, f, indent=2)
+            print(f"Results saved to {output_file}")
+        else:
+            with open(output_file, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['rank', 'image_id', 'score', 'image_path'])
+                for idx, (image_id, score, metadata) in enumerate(results, 1):
+                    writer.writerow([idx, image_id, score, metadata.get('path', '')])
+            print(f"Results saved to {output_file}")
+
 def main():
     parser = argparse.ArgumentParser(description='Shoeprint Matcher CLI')
     subparsers = parser.add_subparsers(dest='command')
@@ -92,11 +112,17 @@ def main():
     search_parser.add_argument('db', help='Path to JSON database')
     search_parser.add_argument('query', help='Path to query shoeprint image')
     search_parser.add_argument('--top', type=int, default=10, help='Number of top matches to display')
+    search_parser.add_argument('--output', help='Path to output CSV or JSON file with matches')
 
     args = parser.parse_args()
     if args.command == 'index':
         index(args.folder, args.db)
     elif args.command == 'search':
+        # Pass output file to search function using attribute
+        if args.output:
+            search.output_file = args.output
+        else:
+            search.output_file = None
         search(args.db, args.query, args.top)
     else:
         parser.print_help()
