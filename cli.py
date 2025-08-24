@@ -21,7 +21,12 @@ def make_json_serializable(obj):
 
 def index(folder, output_json):
     config_path = index.config_path if hasattr(index, 'config_path') and index.config_path else "config.yaml"
+    append = getattr(index, 'append', False)
     pipeline = ShoeprintPipeline(config_path)
+    if append and Path(output_json).exists():
+        with open(output_json, 'r') as f:
+            pipeline.database = json.load(f)
+
     seg_model = Path(pipeline.config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
     feat_model = Path(pipeline.config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
     if seg_model.exists():
@@ -130,6 +135,7 @@ def main():
     index_parser.add_argument('folder', help='Path to folder with shoeprint images')
     index_parser.add_argument('db', help='Path to output JSON database')
     index_parser.add_argument('--config', help='Path to config file (default: config.yaml)')
+    index_parser.add_argument('--append', action='store_true', help='Append to existing database instead of overwriting')
 
     search_parser = subparsers.add_parser('search', help='Search for best matches to a query image')
     search_parser.add_argument('db', help='Path to JSON database')
@@ -142,6 +148,7 @@ def main():
     args = parser.parse_args()
     if args.command == 'index':
         index.config_path = args.config if args.config else None
+        index.append = args.append
         index(args.folder, args.db)
     elif args.command == 'search':
         search.config_path = args.config if args.config else None
