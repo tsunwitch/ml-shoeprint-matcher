@@ -263,3 +263,5 @@ yolo_datasets/
 
 # Streamlit cache
 .streamlit/
+
+*.zip
