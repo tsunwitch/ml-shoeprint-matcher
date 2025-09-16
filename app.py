@@ -66,7 +66,7 @@ def load_database():
     return pipeline
 
 def main():
-    st.title("🦶 Shoeprint Forensics System")
+    st.title("Shoeprint Forensics System")
     
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["Detection", "Feature Detection", "Search", "DTW Profile", "Config"])
     
