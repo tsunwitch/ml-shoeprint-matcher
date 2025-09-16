@@ -317,46 +317,67 @@ def main():
     
     with tab4:
         st.header("Axis Detection & DTW Profile")
-        from src.matching.axis_detection import detect_shoe_axis
-        from src.utils.visualization import draw_axis
         uploaded_file4 = st.file_uploader("Upload image for axis visualization", type=['jpg', 'jpeg', 'png'], key="axis")
         if uploaded_file4 is not None:
             image = Image.open(uploaded_file4)
             image_np = np.array(image)
+            
             pipeline = load_pipeline()
-            mask = None
-            if pipeline.segmenter:
-                with open('config.yaml', 'r') as f:
-                    config = yaml.safe_load(f)
-                margin_ratio = config['models']['shoe_segmentation'].get('horizontal_margin_ratio', 0.1)
-                mask = pipeline.segmenter.get_shoe_mask(image_np, horizontal_margin_ratio=margin_ratio)
-            axis_line = detect_shoe_axis(image_np, mask=mask)
+            
+            # Use the pipeline to process the image just like in the search tab
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+                tmp_file.write(uploaded_file4.getbuffer())
+                temp_path = tmp_file.name
+            
+            # Process the image using the pipeline (same as search tab)
+            results = pipeline.process_image(temp_path)
+            axis_line = results.get('axis_line', None)
+            
+            import os
+            os.unlink(temp_path)
+            
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.subheader("Original Image")
                 st.image(image_np, use_container_width=True)
             with col2:
                 st.subheader("Detected Shoe Axis")
-                img_with_axis = draw_axis(image_np, axis_line, color=(255, 0, 0), thickness=4)
-                st.image(img_with_axis, use_container_width=True)
-                st.caption(f"🔵 Blue: Detected axis from mask-based detection")
+                from src.utils.visualization import draw_axis
+                if axis_line is not None:
+                    img_with_axis = draw_axis(image_np, axis_line, color=(255, 0, 0), thickness=4)
+                    st.image(img_with_axis, use_container_width=True)
+                    st.caption(f"Red: Detected axis from pipeline processing (same as search)")
+                else:
+                    st.image(image_np, use_container_width=True)
+                    st.caption("No axis detected")
             with col3:
                 st.subheader("DTW Profile")
-                from src.utils.image_ops import extract_axis_profile
-                left_profile, right_profile = extract_axis_profile(image_np, axis_line, num_samples=100)
-                import matplotlib.pyplot as plt
-                fig, ax = plt.subplots(figsize=(4, 6))
-                ax.plot(left_profile, range(len(left_profile)), 'g-', linewidth=2, label='Left')
-                ax.plot(right_profile, range(len(right_profile)), 'b-', linewidth=2, label='Right')
-                ax.set_ylabel('Position along axis')
-                ax.set_xlabel('Average intensity')
-                ax.set_title('DTW Profiles (Left/Right)')
-                ax.grid(True, alpha=0.3)
-                ax.invert_yaxis()
-                ax.legend()
-                st.pyplot(fig)
-                st.caption(f"Left profile: {len(left_profile)} points, Right profile: {len(right_profile)} points")
-            # Axis preprocessing steps removed; only mask-based axis detection is used now.
+                if axis_line is not None:
+                    from src.utils.image_ops import extract_axis_profile
+                    # Get mask for profile extraction (same as search tab)
+                    mask = None
+                    if pipeline.segmenter:
+                        with open('config.yaml', 'r') as f:
+                            config = yaml.safe_load(f)
+                        margin_ratio = config['models']['shoe_segmentation'].get('horizontal_margin_ratio', 0.1)
+                        mask = pipeline.segmenter.get_shoe_mask(image_np, horizontal_margin_ratio=margin_ratio)
+                    
+                    left_profile, right_profile = extract_axis_profile(image_np, axis_line, num_samples=100, mask=mask)
+                    import matplotlib.pyplot as plt
+                    fig, ax = plt.subplots(figsize=(4, 6))
+                    ax.plot(left_profile, range(len(left_profile)), 'g-', linewidth=2, label='Left')
+                    ax.plot(right_profile, range(len(right_profile)), 'b-', linewidth=2, label='Right')
+                    ax.set_ylabel('Position along axis')
+                    ax.set_xlabel('Average intensity')
+                    ax.set_title('DTW Profiles (Left/Right)')
+                    ax.grid(True, alpha=0.3)
+                    ax.invert_yaxis()
+                    ax.legend()
+                    st.pyplot(fig)
+                    st.caption(f"Left profile: {len(left_profile)} points, Right profile: {len(right_profile)} points")
+                else:
+                    st.caption("Cannot generate profile without axis detection")
     
     with tab5:
         st.header("Configuration")
