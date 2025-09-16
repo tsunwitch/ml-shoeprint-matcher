@@ -27,10 +27,13 @@ def index(folder, output_json):
         with open(output_json, 'r') as f:
             pipeline.database = json.load(f)
 
-    seg_model = Path(pipeline.config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
+    # Load detection model (shoe detection)
+    det_model = Path(pipeline.config['paths']['models']) / 'shoe_detection' / 'weights' / 'best.pt'
+    if det_model.exists():
+        pipeline.load_models(detection_path=str(det_model))
+
+    # Load feature detection model
     feat_model = Path(pipeline.config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
-    if seg_model.exists():
-        pipeline.load_models(segmentation_path=str(seg_model))
     if feat_model.exists():
         pipeline.load_models(feature_path=str(feat_model))
 
@@ -75,10 +78,14 @@ def index(folder, output_json):
 def search(db_json, query_image, top_k=10):
     config_path = search.config_path if hasattr(search, 'config_path') and search.config_path else "config.yaml"
     pipeline = ShoeprintPipeline(config_path)
-    seg_model = Path(pipeline.config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
+    
+    # Load detection model (shoe detection)
+    det_model = Path(pipeline.config['paths']['models']) / 'shoe_detection' / 'weights' / 'best.pt'
+    if det_model.exists():
+        pipeline.load_models(detection_path=str(det_model))
+
+    # Load feature detection model  
     feat_model = Path(pipeline.config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
-    if seg_model.exists():
-        pipeline.load_models(segmentation_path=str(seg_model))
     if feat_model.exists():
         pipeline.load_models(feature_path=str(feat_model))
     with open(db_json, 'r') as f:
