@@ -18,15 +18,15 @@ def load_pipeline():
     with open('config.yaml', 'r') as f:
         config = yaml.safe_load(f)
     
-    seg_model = Path(config['paths']['models']) / 'shoe_segmentation' / 'weights' / 'best.pt'
+    det_model = Path(config['paths']['models']) / 'shoe_detection' / 'weights' / 'best.pt'
     feat_model = Path(config['paths']['models']) / 'feature_detection' / 'weights' / 'best.pt'
-    
-    if seg_model.exists():
-        pipeline.load_models(segmentation_path=str(seg_model))
-    
+
+    if det_model.exists():
+        pipeline.load_models(detection_path=str(det_model))
+
     if feat_model.exists():
         pipeline.load_models(feature_path=str(feat_model))
-    
+
     return pipeline
 
 @st.cache_resource
@@ -90,17 +90,18 @@ def main():
             with col2:
                 st.subheader("Detection Results")
                 
-                if pipeline.segmenter:
-                    from src.utils.visualization import draw_mask_overlay
-                    with open('config.yaml', 'r') as f:
-                        config = yaml.safe_load(f)
-                    margin_ratio = config['models']['shoe_segmentation'].get('horizontal_margin_ratio', 0.1)
-                    mask = pipeline.segmenter.get_shoe_mask(image_np, horizontal_margin_ratio=margin_ratio)
-                    img_with_mask = draw_mask_overlay(image_np, mask, color=(0,255,0), alpha=0.3)
-                    st.image(img_with_mask, use_container_width=True)
-                    st.caption("Segmentation mask (green overlay)")
+                if hasattr(pipeline, 'detector') and pipeline.detector:
+                    confidence = pipeline.config['models']['shoe_detection']['confidence']
+                    boxes = pipeline.detector.detect_features(image_np, confidence=confidence)
+                    if boxes:
+                        from src.utils.visualization import draw_bbox
+                        img_with_bbox = draw_bbox(image_np, boxes[0], color=(0,255,0), thickness=3)
+                        st.image(img_with_bbox, use_container_width=True)
+                        st.caption("Detection bounding box (green)")
+                    else:
+                        st.caption("No shoe detected")
                 else:
-                    st.caption("No segmentation model loaded")
+                    st.caption("No detection model loaded")
                 
                 if pipeline.feature_detector:
                     st.caption("Feature detection will work on the full image")
@@ -148,11 +149,11 @@ def main():
                     st.image(image_np, use_container_width=True)
                 with col2:
                     st.subheader("Detected Features")
-                    if 'features' in results and results['features']:
+                    if 'features_original' in results and results['features_original']:
                         from src.utils.visualization import draw_features
-                        img_with_features = draw_features(image_np, results['features'])
+                        img_with_features = draw_features(image_np, results['features_original'])
                         st.image(img_with_features, use_container_width=True)
-                        st.info(f"Found {len(results['features'])} features")
+                        st.info(f"Found {len(results['features_original'])} features")
                     else:
                         st.warning("No features detected")
                         st.caption(f"Image shape: {image_np.shape}")

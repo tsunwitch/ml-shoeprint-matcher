@@ -26,6 +26,7 @@ def main():
     # Check which datasets exist
     datasets = {
         'segmentation': Path(config['paths']['yolo_datasets']) / 'shoe_segmentation' / 'data.yaml',
+        'detection': Path(config['paths']['yolo_datasets']) / 'shoe_detection' / 'data.yaml',
         'feature_detection': Path(config['paths']['yolo_datasets']) / 'feature_detection' / 'data.yaml',
         'axis_detection': Path(config['paths']['yolo_datasets']) / 'axis_detection' / 'data.yaml'
     }
@@ -64,8 +65,22 @@ def main():
         except Exception as e:
             print(f"❌ Segmentation training failed: {e}")
         print()
-    
-    # 2. Train feature detection model
+
+    # 2. Train shoe detection model
+    if 'detection' in available_datasets:
+        print("🚀 Training shoe detection model (bounding boxes)...")
+        try:
+            det_model_path = trainer.train_detection_model(
+                str(available_datasets['detection']),
+                config['models']['shoe_detection']
+            )
+            print(f"✅ Detection model saved to: {det_model_path}")
+            trained_models.append(('Detection', det_model_path))
+        except Exception as e:
+            print(f"❌ Detection training failed: {e}")
+        print()
+
+    # 3. Train feature detection model
     if 'feature_detection' in available_datasets:
         print("🚀 Training feature detection model...")
         try:
@@ -78,8 +93,8 @@ def main():
         except Exception as e:
             print(f"❌ Feature detection training failed: {e}")
         print()
-    
-    # 3. Train axis detection model
+
+    # 4. Train axis detection model
     if 'axis_detection' in available_datasets:
         print("🚀 Training axis detection model...")
         try:

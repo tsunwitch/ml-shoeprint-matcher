@@ -29,9 +29,9 @@ class ShoeprintPipeline:
             'metadata': {}
         }
     
-    def load_models(self, segmentation_path: Optional[str] = None, feature_path: Optional[str] = None):
-        if segmentation_path:
-            self.segmenter = ShoeSegmenter(segmentation_path)
+    def load_models(self, detection_path: Optional[str] = None, feature_path: Optional[str] = None):
+        if detection_path:
+            self.detector = FeatureDetector(detection_path)
         if feature_path:
             use_sahi = self.config['models']['feature_detection'].get('use_sahi', False)
             self.feature_detector = FeatureDetector(feature_path, use_sahi=use_sahi)
@@ -46,33 +46,60 @@ class ShoeprintPipeline:
             'image_path': image_path
         }
 
-        results['cropped_shoe'] = image
-        results['shoe_bbox'] = None
+        # Use detection model to get shoe bounding box and crop
+        cropped_shoe = image
+        shoe_bbox = None
+        if hasattr(self, 'detector') and self.detector is not None:
+            confidence = self.config['models']['shoe_detection']['confidence']
+            boxes = self.detector.detect_features(image, confidence=confidence)
+            if boxes:
+                x1, y1, x2, y2 = boxes[0]
+                cropped_shoe = image[int(y1):int(y2), int(x1):int(x2)]
+                shoe_bbox = (int(x1), int(y1), int(x2-x1), int(y2-y1))
+        results['cropped_shoe'] = cropped_shoe
+        results['shoe_bbox'] = shoe_bbox
 
-        mask = None
-        if (self.config['matching']['dtw']['use_segmentation'] and self.segmenter is not None):
-            try:
-                mask = self.segmenter.get_shoe_mask(image)
-            except Exception as e:
-                print(f"Segmentation mask failed, using full image: {e}")
+        # Axis detection using cropped shoe
         try:
             from .matching.axis_detection import detect_shoe_axis
-            axis_line = detect_shoe_axis(image, mask=mask)
+            axis_line_cropped = detect_shoe_axis(cropped_shoe)
         except Exception as e:
-            h, w = image.shape[:2]
-            axis_line = ((w//2, 0), (w//2, h))
-        results['axis_line'] = axis_line
+            h, w = cropped_shoe.shape[:2]
+            axis_line_cropped = ((w//2, 0), (w//2, h))
+        
+        # Translate axis coordinates to original image space if cropping was applied
+        if shoe_bbox is not None:
+            crop_x, crop_y = shoe_bbox[0], shoe_bbox[1]
+            (x1_crop, y1_crop), (x2_crop, y2_crop) = axis_line_cropped
+            axis_line = ((x1_crop + crop_x, y1_crop + crop_y), (x2_crop + crop_x, y2_crop + crop_y))
+        else:
+            axis_line = axis_line_cropped
+            
+        results['axis_line'] = axis_line         # axis in original image coordinates
+        results['axis_line_cropped'] = axis_line_cropped  # axis in cropped image coordinates
 
         if self.feature_detector:
             confidence = self.config['models']['feature_detection']['confidence']
-            features = self.feature_detector.detect_features(image, confidence=confidence)
+            features_cropped = self.feature_detector.detect_features(cropped_shoe, confidence=confidence)
 
-            results['features_original'] = features
+            # Translate features from cropped image coordinates to original image coordinates
+            features_original = []
+            if shoe_bbox is not None and features_cropped:
+                crop_x, crop_y = shoe_bbox[0], shoe_bbox[1]  # offset of crop in original image
+                for x1, y1, x2, y2 in features_cropped:
+                    # Add crop offset to translate coordinates back to original image space
+                    features_original.append((x1 + crop_x, y1 + crop_y, x2 + crop_x, y2 + crop_y))
+            elif features_cropped:
+                # No cropping was done, features are already in original image coordinates
+                features_original = features_cropped
+                
+            results['features_original'] = features_original  # features in original image coordinates
+            results['features_cropped'] = features_cropped      # features in cropped image coordinates
 
-            norm_features = self._normalize_features(features, axis_line, image.shape)
+            norm_features = self._normalize_features(features_cropped, axis_line_cropped, cropped_shoe.shape)
             results['features'] = norm_features
 
-            patches = self.feature_detector.extract_feature_patches(image, features)
+            patches = self.feature_detector.extract_feature_patches(cropped_shoe, features_cropped)
             descriptors = self.feature_detector.compute_feature_descriptors(patches)
             results['feature_descriptors'] = descriptors
 
@@ -125,9 +152,11 @@ class ShoeprintPipeline:
             'path': image_results['image_path'],
             'cropped_shoe': image_results.get('original_image'),
             'original_image': image_results.get('original_image'),
-            'features': image_results.get('features', []),
-            'features_original': image_results.get('features_original', []),
-            'axis_line': image_results.get('axis_line', None)
+            'features': image_results.get('features', []),  # normalized features for matching
+            'features_original': image_results.get('features_original', []),  # features in original image coordinates
+            'features_cropped': image_results.get('features_cropped', []),   # features in cropped image coordinates
+            'axis_line': image_results.get('axis_line', None),         # axis in original image coordinates
+            'axis_line_cropped': image_results.get('axis_line_cropped', None)  # axis in cropped coordinates
         }
     
     def search(self, query_image_path: str, top_k: int = 10) -> List[Tuple[str, float, Dict]]:

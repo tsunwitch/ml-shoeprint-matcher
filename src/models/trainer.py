@@ -3,6 +3,27 @@ from pathlib import Path
 import yaml
 
 class ModelTrainer:
+    def train_detection_model(self, data_yaml: str, config: dict):
+        """
+        Train shoe bounding box detection model (YOLO, not segmentation).
+        """
+        model = YOLO(config['model_size'])
+
+        results = model.train(
+            data=data_yaml,
+            epochs=config['epochs'],
+            batch=config['batch_size'],
+            imgsz=config['imgsz'],
+            project=str(self.model_dir),
+            name='shoe_detection',
+            exist_ok=True,
+            device=0,
+            patience=10,
+            save=True,
+            pretrained=True
+        )
+
+        return self.model_dir / 'shoe_detection' / 'weights' / 'best.pt'
     def __init__(self, model_dir: str = "trained_models"):
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(exist_ok=True)

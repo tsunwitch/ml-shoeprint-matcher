@@ -41,13 +41,17 @@ def main():
     print("\nCreating shoe segmentation dataset...")
     seg_path = converter.create_segmentation_dataset(data, loader, split_info)
     print(f"  Saved to: {seg_path}")
-    
+
+    print("\nCreating shoe detection dataset (bounding boxes)...")
+    det_path = converter.create_detection_dataset(data, loader, split_info)
+    print(f"  Saved to: {det_path}")
+
     print("\nCreating feature detection dataset...")
     feat_path = converter.create_feature_dataset(data, loader, split_info)
     print(f"  Saved to: {feat_path}")
-    
+
     print("\nData preparation complete!")
-    print(f"Next step: Run train_models.py to train the YOLO models")
+    print(f"Next step: Run train_models.py or your detection training script to train the YOLO models")
 
 if __name__ == "__main__":
     main()

@@ -7,6 +7,58 @@ import numpy as np
 import yaml
 
 class YOLOConverter:
+    def create_detection_dataset(self, data: Dict, loader, split_info: Dict):
+        """
+        Create a YOLO detection dataset for shoe bounding boxes (not segmentation).
+        """
+        dataset_path = self.prepare_directories('shoe_detection')
+
+        for split_name, shoe_ids in split_info.items():
+            for shoe_id in shoe_ids:
+                if shoe_id not in data['annotations']:
+                    continue
+
+                for annotator, annotations in data['annotations'][shoe_id].items():
+                    for print_id, annotation in annotations.items():
+                        image_path = data['images'][shoe_id][annotator][print_id]
+
+                        mark_annotations = loader.get_marking_by_type(annotation, 'Mark')
+                        if not mark_annotations:
+                            continue
+
+                        img_height, img_width = loader.get_image_shape(image_path)
+                        if img_height == 0:
+                            continue
+
+                        output_name = f"{shoe_id}_{annotator}_{print_id}"
+
+                        shutil.copy(
+                            image_path,
+                            dataset_path / 'images' / split_name / f"{output_name}.jpg"
+                        )
+
+                        label_path = dataset_path / 'labels' / split_name / f"{output_name}.txt"
+                        with open(label_path, 'w') as f:
+                            for mark in mark_annotations:
+                                bbox = loader.extract_bbox(mark)
+                                x_center, y_center, width, height = self.convert_bbox_to_yolo(
+                                    bbox, img_width, img_height
+                                )
+                                f.write(f"0 {x_center} {y_center} {width} {height}\n")
+
+        yaml_content = {
+            'path': str(dataset_path.absolute()),
+            'train': 'images/train',
+            'val': 'images/val',
+            'test': 'images/test',
+            'names': {0: 'shoe'},
+            'nc': 1
+        }
+
+        with open(dataset_path / 'data.yaml', 'w') as f:
+            yaml.dump(yaml_content, f)
+
+        return dataset_path
     def __init__(self, output_dir: str):
         self.output_dir = Path(output_dir)
         
